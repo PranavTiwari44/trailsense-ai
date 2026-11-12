@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     # LLM_PROVIDER=gpt in .env would fail fast at startup with a clear error.
     llm_provider: Literal["ollama", "claude"] = "ollama"
 
-    ollama_model: str = "qwen2.5:7b"
+    ollama_model: str = "qwen3.5:9b"
     ollama_host: str = "http://localhost:11434"
 
     # `str | None` means "a string, or nothing". Optional until Milestone 9.
