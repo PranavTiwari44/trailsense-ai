@@ -1,4 +1,4 @@
-"""FastAPI entry point. Routes live here (like a Spring @RestController)."""
+"""The web app: creates FastAPI and lists the URLs it answers."""
 
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
@@ -13,14 +13,14 @@ app = FastAPI(
 )
 
 
-# include_in_schema=False hides this route from /docs, since it's only a convenience.
-@app.get("/", include_in_schema=False)
+@app.get("/", include_in_schema=False)  # include_in_schema=False hides it from /docs
 def root() -> RedirectResponse:
+    """Send visitors of the home page to the API docs."""
     return RedirectResponse(url="/docs")
 
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    # FastAPI turns the returned dict into JSON automatically.
+    """Quick check that the app is running, and which AI it is set to use."""
     settings = get_settings()
     return {"status": "ok", "llm_provider": settings.llm_provider}

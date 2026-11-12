@@ -1,8 +1,9 @@
 # Secrets
 .env
 
-# Local-only notes for Claude Code
+# Local-only notes
 CLAUDE.md
+LEARNINGS.md
 
 # Python
 __pycache__/

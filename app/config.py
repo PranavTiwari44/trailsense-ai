@@ -1,8 +1,4 @@
-"""App settings, loaded from environment variables and the .env file.
-
-Think of this like Spring Boot's @ConfigurationProperties: one typed class,
-fields filled in from the environment, with defaults and validation for free.
-"""
+"""App settings, read from environment variables and the .env file."""
 
 from functools import lru_cache
 from typing import Literal
@@ -11,24 +7,34 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    # Tells pydantic-settings to also read a .env file in the working directory.
-    # Real environment variables win over .env values.
+    """All the app's settings in one place, each with a default.
+
+    A value in .env (or a real environment variable) replaces the default.
+    For example, OLLAMA_MODEL=llama3.1:8b in .env changes `ollama_model`.
+    """
+
+    # Also read the .env file. Real environment variables win over .env values.
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    # Literal = only these exact strings are allowed (like a Java enum).
-    # LLM_PROVIDER=gpt in .env would fail fast at startup with a clear error.
+    # Which AI to use. Only these two values are allowed; anything else stops the app at startup.
     llm_provider: Literal["ollama", "claude"] = "ollama"
 
     ollama_model: str = "qwen3.5:9b"
     ollama_host: str = "http://localhost:11434"
 
-    # `str | None` means "a string, or nothing". Optional until Milestone 9.
+    # Outside data websites (all free, no key needed).
+    open_meteo_url: str = "https://api.open-meteo.com/v1"
+    overpass_url: str = "https://overpass-api.de/api/interpreter"
+    http_timeout_s: float = 10.0
+    # Overpass is often slow. After this many seconds we give up and use the saved trails file.
+    overpass_timeout_s: float = 15.0
+
+    # Only needed later, if we try Claude.
     anthropic_api_key: str | None = None
     anthropic_model: str | None = None
 
 
-# @lru_cache makes this a lazy singleton: the first call builds Settings,
-# every later call returns the same object (like a Spring @Bean).
-@lru_cache
+@lru_cache  # build the settings once, then hand back the same object every time
 def get_settings() -> Settings:
+    """Return the app's settings."""
     return Settings()

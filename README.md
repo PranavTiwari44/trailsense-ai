@@ -16,9 +16,12 @@ A small FastAPI service where you ask about a hiking trail in plain English, lik
 
 ## Features
 
-- `GET /health` health check
-- Settings come from `.env` (LLM provider, model, Ollama host)
-- Auto-generated API docs at `/docs`
+- `GET /health` health check, auto-generated API docs at `/docs`
+- **Trail search** in OpenStreetMap: groups a trail's many path segments into one trail, adds up the length, and keeps the hardest difficulty tag
+- **Local fallback** of real Gatineau Park trails, used automatically when Overpass is slow or down
+- **Live weather** for the trailhead: now, the past 6 hours (for ice) and the next 6 hours
+- **Elevation gain** along the trail, with requests batched and run in parallel
+- Settings come from `.env` (LLM provider, model, API URLs, timeouts)
 
 ## Run it locally
 
@@ -36,9 +39,25 @@ Then open [localhost:8000/docs](http://localhost:8000/docs).
 
 Run the tests with `uv run pytest`.
 
+Try the data services against the real APIs:
+
+```powershell
+uv run python -m scripts.try_services "Wolf Trail"
+```
+
+## Data
+
+| Source | Used for | Key needed |
+|---|---|---|
+| [Open-Meteo](https://open-meteo.com) | Weather forecast and elevation | No |
+| [OpenStreetMap](https://www.openstreetmap.org) via [Overpass](https://overpass-api.de) | Trail names, paths and difficulty tags | No |
+
+`app/data/trails_fallback.json` is a snapshot of OpenStreetMap data for a few Gatineau Park trails (Wolf Trail, King Mountain, Luskville Falls, Pink Lake). Rebuild it with `uv run python -m scripts.build_fallback`.
+
+Map data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), available under the Open Database License.
+
 ## To do
 
-- Data services: Open-Meteo weather and elevation, OpenStreetMap trails (with a local fallback)
 - Difficulty rules engine + `GET /difficulty`
 - LLM tool calling with Ollama, behind a swappable provider interface
 - `POST /explain` with structured JSON output
