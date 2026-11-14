@@ -17,6 +17,8 @@ A small FastAPI service where you ask about a hiking trail in plain English, lik
 ## Features
 
 - `GET /health` health check, auto-generated API docs at `/docs`
+- **Difficulty rules engine**: scores a trail 0–100 from its length, climb, OSM difficulty tag and the next hours of weather (rain, ice, wind, heat). A thunderstorm makes it *Dangerous* whatever the score, and missing data gives *Unknown*, never *Easy*
+- `GET /difficulty?trail_id=wolf-trail`: the engine's answer for a trail right now (no AI)
 - **Trail search** in OpenStreetMap: groups a trail's many path segments into one trail, adds up the length, and keeps the hardest difficulty tag
 - **Local fallback** of real Gatineau Park trails, used automatically when Overpass is slow or down
 - **Live weather** for the trailhead: now, the past 6 hours (for ice) and the next 6 hours
@@ -58,7 +60,6 @@ Map data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright
 
 ## To do
 
-- Difficulty rules engine + `GET /difficulty`
 - LLM tool calling with Ollama, behind a swappable provider interface
 - `POST /explain` with structured JSON output
 - Agent tests with a fake LLM client, and an eval set

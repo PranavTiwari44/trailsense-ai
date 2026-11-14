@@ -50,6 +50,19 @@ class Weather(BaseModel):
     next_hours: list[WeatherHour]
 
 
+# The difficulty levels. "Unknown" is used when data is missing (never guess "Easy").
+Level = Literal["Easy", "Moderate", "Hard", "Dangerous", "Unknown"]
+
+
+class DifficultyResult(BaseModel):
+    """What the rules engine decided: a score, a level, and the reasons for it."""
+
+    score: int | None  # 0 to 100; None when the level is "Unknown"
+    level: Level
+    reasons: list[str]  # plain sentences, e.g. "8 km long (+8)"
+    data_time: datetime | None  # time of the weather reading used; None if there was no weather
+
+
 class ElevationProfile(BaseModel):
     """How much climbing a trail has, plus its lowest and highest points."""
 
