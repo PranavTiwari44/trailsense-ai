@@ -21,6 +21,11 @@ class Settings(BaseSettings):
 
     ollama_model: str = "qwen3.5:9b"
     ollama_host: str = "http://localhost:11434"
+    # "Thinking" makes the model reason privately before answering. In our test it
+    # took 149 s instead of 3 s for a one-sentence answer, so it's off by default.
+    ollama_think: bool = False
+    # How long to wait for the AI to answer before giving up.
+    llm_timeout_s: float = 300.0
 
     # Outside data websites (all free, no key needed).
     open_meteo_url: str = "https://api.open-meteo.com/v1"
