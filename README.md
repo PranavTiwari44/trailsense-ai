@@ -19,6 +19,7 @@ A small FastAPI service where you ask about a hiking trail in plain English, lik
 - `GET /health` health check, auto-generated API docs at `/docs`
 - **Difficulty rules engine**: scores a trail 0–100 from its length, climb, OSM difficulty tag and the next hours of weather (rain, ice, wind, heat). A thunderstorm makes it *Dangerous* whatever the score, and missing data gives *Unknown*, never *Easy*
 - `GET /difficulty?trail_id=wolf-trail`: the engine's answer for a trail right now (no AI)
+- **LLM tool calling**: the model asks for `find_trail`, `get_weather`, `get_elevation_gain` and `get_difficulty_score` and chains them on its own (e.g. finds the trail, then uses its id). Tool errors go back to the model as messages, never crashes, and a step limit stops runaway loops
 - **Swappable AI interface**: the app talks to one `LLMClient` shape; `LLM_PROVIDER` picks the model behind it. Runs locally on Ollama (`qwen3.5:9b`) for free
 - **Trail search** in OpenStreetMap: groups a trail's many path segments into one trail, adds up the length, and keeps the hardest difficulty tag
 - **Local fallback** of real Gatineau Park trails, used automatically when Overpass is slow or down
@@ -48,6 +49,12 @@ Try the data services against the real APIs:
 uv run python -m scripts.try_services "Wolf Trail"
 ```
 
+Ask the local model a question and watch it use the tools (needs Ollama running):
+
+```powershell
+uv run python -m scripts.try_agent "How hard is the Wolf Trail in Gatineau Park right now?"
+```
+
 ## Data
 
 | Source | Used for | Key needed |
@@ -61,6 +68,5 @@ Map data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright
 
 ## To do
 
-- LLM tool calling: the model asks for trail, weather and difficulty data through tools
 - `POST /explain` with structured JSON output
 - Agent tests with a fake LLM client, and an eval set
