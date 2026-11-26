@@ -22,15 +22,17 @@
         <div class="ask-row">
           <input id="question" name="question" type="text" autocomplete="off"
                  placeholder="How hard is the Wolf Trail in Gatineau Park right now?"
-                 minlength="3" maxlength="500" required>
+                 minlength="3" maxlength="500" required aria-describedby="ask-hint">
           <button id="ask-button" type="submit">Ask</button>
         </div>
+        <p id="ask-hint" class="ask-hint">Searches Ottawa–Gatineau by default. Somewhere else? Add the city, like “the Beltline Trail <strong>in Toronto</strong>”.</p>
         <div class="examples" aria-label="Example questions">
           <span class="examples-label">Try:</span>
           <button type="button" class="example">How hard is the Wolf Trail right now?</button>
           <button type="button" class="example">Is King Mountain trail hard today?</button>
           <button type="button" class="example">How hard is Pink Lake trail?</button>
           <button type="button" class="example">How hard is Luskville Falls trail?</button>
+          <button type="button" class="example">How hard is the Beltline Trail in Toronto?</button>
         </div>
       </form>
 
@@ -54,6 +56,7 @@
         </div>
 
         <p id="summary" class="summary"></p>
+        <p id="not-found-tip" class="tip" hidden>Tip: TrailSense searches Ottawa–Gatineau unless you name a place. If the trail is somewhere else, add the city, e.g. “How hard is the Beltline Trail <strong>in Toronto</strong>?”</p>
 
         <div class="lists">
           <section id="reasons-box">

@@ -118,6 +118,16 @@ button:focus-visible {
   outline-offset: 2px;
 }
 
+.ask-hint { margin: 8px 0 0; font-size: 14px; color: var(--muted); }
+
+.tip {
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  font-size: 15px;
+  background: var(--bg);
+  border-radius: 8px;
+}
+
 .examples {
   display: flex;
   flex-wrap: wrap;

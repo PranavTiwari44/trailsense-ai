@@ -90,7 +90,7 @@ def test_every_tool_shown_to_the_ai_can_be_run():
 
 
 async def test_find_trail_returns_details_without_the_map_points(monkeypatch):
-    async def fake_find_trail(name):
+    async def fake_find_trail(name, near=None):
         return TrailInfo(id="wolf-trail", name="Wolf Trail", length_km=8.9, sac_scale="mountain_hiking",
                          start_lat=45.5, start_lon=-75.9, source="fallback",
                          segments=[[(45.5, -75.9), (45.6, -75.8)]])
@@ -106,7 +106,7 @@ async def test_find_trail_returns_details_without_the_map_points(monkeypatch):
 
 
 async def test_find_trail_not_found_gives_an_error_message(monkeypatch):
-    async def fake_find_trail(name):
+    async def fake_find_trail(name, near=None):
         raise TrailNotFoundError(f"No trail found matching {name!r}")
 
     monkeypatch.setattr(tools, "find_trail", fake_find_trail)
@@ -114,6 +114,22 @@ async def test_find_trail_not_found_gives_an_error_message(monkeypatch):
     result = await tools.run_tool(ToolCall(name="find_trail", arguments={"name": "Narnia Loop"}))
 
     assert json.loads(result) == {"error": "No trail found matching 'Narnia Loop'"}
+
+
+async def test_find_trail_passes_the_place_through(monkeypatch):
+    places_asked = []
+
+    async def fake_find_trail(name, near=None):
+        places_asked.append(near)
+        return TrailInfo(id="kay-gardiner-beltline-trail", name="Kay Gardiner Beltline Trail", length_km=4.5,
+                         start_lat=43.7, start_lon=-79.4, source="overpass")
+
+    monkeypatch.setattr(tools, "find_trail", fake_find_trail)
+
+    await tools.run_tool(ToolCall(name="find_trail", arguments={"name": "Beltline", "near": "Toronto"}))
+    await tools.run_tool(ToolCall(name="find_trail", arguments={"name": "Wolf Trail"}))
+
+    assert places_asked == ["Toronto", None]  # near is optional
 
 
 async def test_find_trail_with_an_empty_name_gives_an_error_message():

@@ -14,6 +14,7 @@ from app.config import get_settings
 from app.services import trails
 from app.services.elevation import distance_m, get_elevation_profile
 from app.services.errors import DataUnavailableError, TrailNotFoundError
+from app.services.places import DEFAULT_AREA, area_around, find_place, is_inside, search_area_for
 from app.services.trails import find_trail, get_trail, join_pieces, make_id, search_words
 from app.services.weather import get_weather
 
@@ -186,9 +187,58 @@ def test_join_pieces_makes_one_trail_with_the_hardest_difficulty():
 
 
 def test_overpass_query_only_searches_walking_paths():
-    query = trails.build_overpass_query(["mer", "bleue"], timeout_s=10)
+    query = trails.build_overpass_query(["mer", "bleue"], 10, DEFAULT_AREA)
     assert "path|footway" in query
+    assert "cycleway" in query  # shared walking/cycling paths like Toronto's Beltline
     assert '["highway"]' not in query  # a plain "highway" filter would match roads too
+
+
+def test_overpass_query_searches_the_given_area():
+    query = trails.build_overpass_query(["beltline"], 10, (43.4, -79.8, 44.0, -79.0))
+    assert "(43.4,-79.8,44.0,-79.0)" in query
+
+
+# ---------- Places: searching near a city or town ----------
+
+GEOCODING_URL = f"{settings.geocoding_url}/search"
+TORONTO = {"results": [{"name": "Toronto", "latitude": 43.70643, "longitude": -79.39864}]}
+
+
+def test_area_around_reaches_about_30_km_each_way():
+    south, west, north, east = area_around(43.7, -79.4)
+
+    assert distance_m((south, -79.4), (north, -79.4)) == pytest.approx(60_000, rel=0.02)
+    assert distance_m((43.7, west), (43.7, east)) == pytest.approx(60_000, rel=0.02)
+    assert is_inside((south, west, north, east), 43.7, -79.4)
+    assert not is_inside((south, west, north, east), 45.4, -75.7)  # Ottawa is far outside
+
+
+@respx.mock
+async def test_find_place_uses_only_the_town_name():
+    route = respx.get(GEOCODING_URL).mock(return_value=httpx.Response(200, json=TORONTO))
+
+    place = await find_place("Toronto, Ontario")
+
+    assert place == (43.70643, -79.39864)
+    assert route.calls.last.request.url.params["name"] == "Toronto"  # ", Ontario" dropped
+
+
+@respx.mock
+async def test_unknown_place_searches_ottawa_gatineau():
+    respx.get(GEOCODING_URL).mock(return_value=httpx.Response(200, json={}))  # no "results" at all
+
+    assert await search_area_for("Gatineau Park") == DEFAULT_AREA  # parks aren't towns
+
+
+@respx.mock
+async def test_geocoder_down_searches_ottawa_gatineau():
+    respx.get(GEOCODING_URL).mock(return_value=httpx.Response(503))
+
+    assert await search_area_for("Toronto") == DEFAULT_AREA
+
+
+async def test_no_place_searches_ottawa_gatineau():
+    assert await search_area_for(None) == DEFAULT_AREA
 
 
 # ---------- Trails: find_trail ----------
@@ -226,8 +276,34 @@ async def test_find_trail_by_french_name_in_saved_file():
 async def test_find_trail_with_unknown_name_raises():
     respx.post(settings.overpass_url).mock(return_value=httpx.Response(200, json={"elements": []}))
 
-    with pytest.raises(TrailNotFoundError):
+    with pytest.raises(TrailNotFoundError) as error:
         await find_trail("Definitely Not A Real Trail")
+
+    # The message tells the AI (and so the person) how to search outside Ottawa–Gatineau.
+    assert "Ottawa–Gatineau" in str(error.value)
+    assert "city" in str(error.value)
+
+
+@respx.mock
+async def test_find_trail_near_a_city_searches_around_it():
+    respx.get(GEOCODING_URL).mock(return_value=httpx.Response(200, json=TORONTO))
+    overpass = respx.post(settings.overpass_url).mock(return_value=httpx.Response(200, json={"elements": []}))
+
+    with pytest.raises(TrailNotFoundError, match="near Toronto"):
+        await find_trail("Beltline", near="Toronto")
+
+    query = overpass.calls.last.request.content.decode()
+    assert "43.4" in query and "-79." in query  # the Toronto box, not Ottawa's
+
+
+@respx.mock
+async def test_saved_ottawa_trails_are_not_used_for_another_city():
+    respx.get(GEOCODING_URL).mock(return_value=httpx.Response(200, json=TORONTO))
+    respx.post(settings.overpass_url).mock(return_value=httpx.Response(502))  # Overpass down
+
+    # The saved file has Wolf Trail, but it's in Gatineau, not Toronto.
+    with pytest.raises(TrailNotFoundError):
+        await find_trail("Wolf Trail", near="Toronto")
 
 
 def test_get_trail_with_unknown_id_raises():

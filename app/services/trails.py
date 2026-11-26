@@ -22,17 +22,17 @@ from app.models import LatLon, TrailInfo
 from app.services.elevation import distance_m
 from app.services.errors import DataUnavailableError, TrailNotFoundError
 from app.services.http import make_client
+from app.services.places import Area, is_inside, search_area_for
 
 logger = logging.getLogger(__name__)
 
 FALLBACK_FILE = Path(__file__).parent.parent / "data" / "trails_fallback.json"
 
-# The area we search: Ottawa–Gatineau, as (south, west, north, east).
-SEARCH_AREA = (45.20, -76.20, 45.75, -75.40)
-
 # OpenStreetMap path types you can walk on. Roads are also tagged "highway"
 # in OpenStreetMap, so without this filter "Mer Bleue" matched a road.
-WALKING_PATH_TYPES = "path|footway|track|steps|bridleway"
+# "cycleway" is included because many Canadian trails (like Toronto's Beltline)
+# are shared walking and cycling paths that OpenStreetMap tags as cycleways.
+WALKING_PATH_TYPES = "path|footway|cycleway|track|steps|bridleway"
 
 # OpenStreetMap difficulty tags, from easiest to hardest.
 DIFFICULTY_ORDER = [
@@ -105,10 +105,10 @@ def points_of(piece: dict) -> list[LatLon]:
 
 # ---------- Searching OpenStreetMap ----------
 
-def build_overpass_query(words: list[str], timeout_s: int) -> str:
-    """Write the Overpass search: walking paths in our area whose name contains the words."""
+def build_overpass_query(words: list[str], timeout_s: int, search_area: Area) -> str:
+    """Write the Overpass search: walking paths in the area whose name contains the words."""
     name_pattern = ".*".join(words)  # ["lac", "pink"] -> "lac.*pink"
-    area = ",".join(str(value) for value in SEARCH_AREA)
+    area = ",".join(str(value) for value in search_area)
     path_filter = f'["highway"~"^({WALKING_PATH_TYPES})$"]'
     # We check both the local name and the English name ("name:en").
     # `out tags geom` asks for each piece's tags and its points.
@@ -167,14 +167,14 @@ def join_pieces(elements: list[dict], words: list[str]) -> TrailInfo | None:
     )
 
 
-async def search_overpass(name: str) -> TrailInfo | None:
-    """Search OpenStreetMap for a trail by name.
+async def search_overpass(name: str, search_area: Area) -> TrailInfo | None:
+    """Search OpenStreetMap for a trail by name, inside the given area.
 
     Returns None if nothing matched. Raises DataUnavailableError if Overpass failed or was too slow.
     """
     settings = get_settings()
     words = search_words(name)
-    query = build_overpass_query(words, timeout_s=int(settings.overpass_timeout_s))
+    query = build_overpass_query(words, int(settings.overpass_timeout_s), search_area)
     try:
         # Give the HTTP request a few seconds more than Overpass's own time limit.
         async with make_client(timeout_s=settings.overpass_timeout_s + 5) as client:
@@ -205,10 +205,16 @@ def load_fallback_trails() -> list[FallbackTrail]:
     return [FallbackTrail.model_validate(item) for item in data["trails"]]
 
 
-def search_fallback(name: str) -> TrailInfo | None:
-    """Look for a trail by name (or other name) in the saved file. Returns None if not found."""
+def search_fallback(name: str, search_area: Area) -> TrailInfo | None:
+    """Look for a trail by name (or other name) in the saved file, inside the area.
+
+    The area check stops "Pink Lake near Toronto" from returning Gatineau's Pink Lake.
+    Returns None if not found.
+    """
     words = search_words(name)
     for saved in load_fallback_trails():
+        if not is_inside(search_area, saved.trail.start_lat, saved.trail.start_lon):
+            continue
         if name_matches(words, [saved.trail.name] + saved.aliases):
             return saved.trail
     return None
@@ -216,23 +222,30 @@ def search_fallback(name: str) -> TrailInfo | None:
 
 # ---------- What the rest of the app calls ----------
 
-async def find_trail(name: str) -> TrailInfo:
-    """Find a trail by name: OpenStreetMap first, then the saved file.
+async def find_trail(name: str, near: str | None = None) -> TrailInfo:
+    """Find a trail by name, near a city or town if one is given (otherwise in Ottawa–Gatineau).
 
-    Raises TrailNotFoundError if neither has it.
+    Tries OpenStreetMap first, then the saved file. Raises TrailNotFoundError if neither has it.
     """
+    search_area = await search_area_for(near)
     trail = None
     try:
-        trail = await search_overpass(name)
+        trail = await search_overpass(name, search_area)
         if trail is None:
             logger.info("Overpass found no trail matching %r; trying the saved file", name)
     except DataUnavailableError as error:
         logger.warning("%s; using the saved file", error)
 
     if trail is None:
-        trail = search_fallback(name)
+        trail = search_fallback(name, search_area)
     if trail is None:
-        raise TrailNotFoundError(f"No trail found matching {name!r}")
+        if near:
+            raise TrailNotFoundError(f"No trail found matching {name!r} near {near}")
+        # Tell the AI (and so the person) how to search elsewhere.
+        raise TrailNotFoundError(
+            f"No trail found matching {name!r} in Ottawa–Gatineau, the area searched by default. "
+            "If the trail is somewhere else, ask again with the city or town, e.g. 'in Toronto'."
+        )
 
     _found_trails[trail.id] = trail
     return trail

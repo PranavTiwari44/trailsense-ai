@@ -29,10 +29,12 @@ class Settings(BaseSettings):
 
     # Outside data websites (all free, no key needed).
     open_meteo_url: str = "https://api.open-meteo.com/v1"
+    geocoding_url: str = "https://geocoding-api.open-meteo.com/v1"  # place name -> lat/lon
     overpass_url: str = "https://overpass-api.de/api/interpreter"
     http_timeout_s: float = 10.0
-    # Overpass is often slow. After this many seconds we give up and use the saved trails file.
-    overpass_timeout_s: float = 15.0
+    # Overpass is often slow (30+ s in our tests). After this many seconds we give up and
+    # use the saved trails file. Trails found once are remembered, so it's only slow the first time.
+    overpass_timeout_s: float = 45.0
 
     # Only needed later, if we try Claude.
     anthropic_api_key: str | None = None

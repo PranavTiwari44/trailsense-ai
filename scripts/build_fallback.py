@@ -12,6 +12,7 @@ from datetime import date
 
 from app.models import TrailInfo
 from app.services.elevation import thin_points
+from app.services.places import DEFAULT_AREA
 from app.services.trails import FALLBACK_FILE, search_overpass
 
 # Each entry: (name to search for, other names the trail can be found by).
@@ -29,7 +30,7 @@ async def fetch(name: str) -> TrailInfo | None:
     """Search Overpass for a trail, trying up to 3 times because Overpass is often busy."""
     for attempt in range(1, ATTEMPTS + 1):
         try:
-            return await search_overpass(name)
+            return await search_overpass(name, DEFAULT_AREA)
         except Exception as error:
             print(f"  attempt {attempt} failed: {error}")
             await asyncio.sleep(5)

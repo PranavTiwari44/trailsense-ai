@@ -123,6 +123,8 @@ function showResult(answer: ExplainResponse): void {
   }
 
   getElement("summary").textContent = answer.summary;
+  // No trail found: remind people they can name a city outside Ottawa–Gatineau.
+  getElement("not-found-tip").hidden = answer.trail_name !== null;
   fillList("reasons", "reasons-box", answer.reasons);
   fillList("warnings", "warnings-box", answer.warnings);
   fillList("gear", "gear-box", answer.gear_tips);

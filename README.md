@@ -9,7 +9,7 @@
   ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
   ![HTML](https://img.shields.io/badge/HTML-E34F26?logo=html5&logoColor=white)
   ![CSS](https://img.shields.io/badge/CSS-663399?logo=css&logoColor=white)
-  ![Tests](https://img.shields.io/badge/tests-125%20passing-2E7D32)
+  ![Tests](https://img.shields.io/badge/tests-134%20passing-2E7D32)
 </div>
 
 ## About
@@ -55,7 +55,7 @@ The key rule: **my code decides, the AI explains.** If the AI's level disagrees 
 
 **Rules engine and data**
 - **Difficulty rules engine**: scores a trail 0–100 from its length, climb, OSM difficulty tag and the next hours of weather (rain, ice, wind, heat). A thunderstorm makes it *Dangerous* whatever the score
-- **Trail search** in OpenStreetMap: joins a trail's many path pieces into one trail, adds up the length, and keeps the hardest difficulty tag
+- **Trail search** in OpenStreetMap: joins a trail's many path pieces into one trail, adds up the length, and keeps the hardest difficulty tag. Searches Ottawa–Gatineau by default, or about 30 km around any city or town you name (*"the Beltline Trail in Toronto"*). Includes shared walking/cycling paths, which is how many Canadian trails are mapped
 - **Local fallback** of real Gatineau Park trails, used automatically when Overpass is slow or down
 - **Live weather** at the trailhead: now, the past 6 hours (for ice) and the next 6 hours
 - **Elevation gain** along the trail, with requests batched and run in parallel
@@ -97,7 +97,7 @@ npm run build    # or: npm run watch, to rebuild on every save
 ## Tests
 
 ```powershell
-uv run pytest    # 125 tests, about a second
+uv run pytest    # 134 tests, about a second
 ```
 
 The AI is replaced by a scripted fake client, so the tests need no model, no internet and cost nothing. They cover the rules engine, the data services (with faked HTTP), the tools, the tool loop, the retry on invalid JSON, the engine overriding the AI's level, both safety nets, the API endpoints, the web page files, and the eval checks themselves.
@@ -147,7 +147,7 @@ app/
   main.py            web routes: the page, /explain, /difficulty, /health
   models.py          data shapes (Pydantic): trail, weather, answers
   engine/            the difficulty rules engine (plain functions, no web, no AI)
-  services/          Open-Meteo weather and elevation, OpenStreetMap trails + fallback
+  services/          weather, elevation, place lookup (Open-Meteo), OpenStreetMap trails + fallback
   llm/               the AI side: interface, Ollama client, tools, the agent loop
 web/                 the web page: index.html, styles.css, src/app.ts -> dist/app.js
 evals/               18 fixed scenarios, the runner, and saved results per run
@@ -159,7 +159,7 @@ scripts/             small scripts to try each piece by hand
 
 | Source | Used for | Key needed |
 |---|---|---|
-| [Open-Meteo](https://open-meteo.com) | Weather forecast and elevation | No |
+| [Open-Meteo](https://open-meteo.com) | Weather forecast, elevation, and finding a city's location | No |
 | [OpenStreetMap](https://www.openstreetmap.org) via [Overpass](https://overpass-api.de) | Trail names, paths and difficulty tags | No |
 
 `app/data/trails_fallback.json` is a snapshot of OpenStreetMap data for a few Gatineau Park trails (Wolf Trail, King Mountain, Luskville Falls, Pink Lake). Rebuild it with `uv run python -m scripts.build_fallback`.
@@ -170,4 +170,5 @@ Map data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright
 
 - A separate `conditions` field for the weather, so the summary has room for trail facts (see the third eval run)
 - An eval check for invented facts without numbers. Live runs showed the small model sometimes adds things that aren't in the data (a made-up "cold alert", "snow" when there was none, calling 11 km/h wind "strong"), which the current number and keyword checks don't catch
+- Faster trail search: Overpass often takes 30–45 s, so a new trail's first answer is slow. Found trails are remembered only until the server restarts; saving them would help
 - Optional: run the same evals with Claude and compare

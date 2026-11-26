@@ -28,16 +28,22 @@ logger = logging.getLogger(__name__)
 # ---------- find_trail ----------
 
 class FindTrailInput(BaseModel):
-    """The inputs for find_trail: the trail's name."""
+    """The inputs for find_trail: the trail's name, and optionally a city or town to search near."""
 
     name: str = Field(min_length=1, description="The trail's name, e.g. 'Wolf Trail'")
+    near: str | None = Field(
+        default=None,
+        description="The city or town the person mentioned, e.g. 'Toronto'. "
+                    "Leave it out if they didn't name one (we then search Ottawa–Gatineau).",
+    )
 
 
 FIND_TRAIL_TOOL = ToolSpec(
     name="find_trail",
     description=(
-        "Find a hiking trail by name. Returns its id (needed by the other trail tools), "
-        "length in km, OpenStreetMap difficulty tag (sac_scale) and the lat/lon of its start."
+        "Find a hiking trail by name, near a city or town if the person named one. "
+        "Returns its id (needed by the other trail tools), length in km, "
+        "OpenStreetMap difficulty tag (sac_scale) and the lat/lon of its start."
     ),
     parameters=FindTrailInput.model_json_schema(),
 )
@@ -46,7 +52,7 @@ FIND_TRAIL_TOOL = ToolSpec(
 async def run_find_trail(arguments: dict[str, Any]) -> dict[str, Any]:
     """Check the inputs, look the trail up, and return its details (without the map points)."""
     inputs = FindTrailInput.model_validate(arguments)
-    trail = await find_trail(inputs.name)
+    trail = await find_trail(inputs.name, inputs.near)
     # The map points are hundreds of numbers the AI doesn't need, so we leave them out.
     return trail.model_dump(mode="json", exclude={"segments"})
 
