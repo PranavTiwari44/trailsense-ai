@@ -6,11 +6,25 @@
   ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
   ![Pydantic](https://img.shields.io/badge/Pydantic-2-E92063?logo=pydantic&logoColor=white)
   ![Ollama](https://img.shields.io/badge/Ollama-local-000000?logo=ollama&logoColor=white)
+  ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
+  ![HTML](https://img.shields.io/badge/HTML-E34F26?logo=html5&logoColor=white)
+  ![CSS](https://img.shields.io/badge/CSS-663399?logo=css&logoColor=white)
+  ![Tests](https://img.shields.io/badge/tests-125%20passing-2E7D32)
 </div>
 
 ## About
 
-A small FastAPI service where you ask about a hiking trail in plain English, like *"How hard is the Wolf Trail in Gatineau Park right now?"*. A local LLM calls my tools to get live weather, trail info and elevation, and my own rules engine decides the difficulty. The LLM only collects the data and explains the result.
+Ask about a hiking trail in plain English, like *"How hard is the Wolf Trail in Gatineau Park right now?"*, on a web page or through the API. A local AI model calls my tools to get live weather, trail info and elevation, and my own rules engine decides the difficulty. The AI only collects the data and explains the result.
+
+**How one question flows:**
+
+```
+question ─► AI picks tools ─► find_trail ─► get_weather ─► get_difficulty_score (my rules engine)
+                                                                   │
+answer card ◄── engine's level + score ◄── AI writes the words (checked JSON)
+```
+
+The key rule: **my code decides, the AI explains.** If the AI's level disagrees with the engine, the engine wins. Missing data gives *Unknown*, never *Easy*.
 
 > **Check official park conditions before hiking.** This app gives information, not safety guarantees.
 
@@ -27,23 +41,36 @@ A small FastAPI service where you ask about a hiking trail in plain English, lik
 
 ## Features
 
-- **Web page** at `/` for normal people: ask a question or tap an example, see a loading counter while the AI works, then a result card with the level colour-coded, the summary, reasons, warnings, gear tips and the data time. Friendly messages when something fails, works on a phone and in dark mode. TypeScript + HTML + CSS, no framework
-- `POST /explain`: ask a question in plain English, get a structured JSON answer (level, score, summary, reasons, warnings, gear tips, data time). The AI writes the words; **the rules engine decides the level and score**, and overrides the AI if they disagree
-- **Structured output**: the AI must reply with JSON matching a Pydantic schema (Ollama's `format` option), validated and retried once if invalid. If the AI forgets to ask for the difficulty score, the app asks for it itself
-- `GET /health` health check, auto-generated API docs at `/docs`
-- **Difficulty rules engine**: scores a trail 0–100 from its length, climb, OSM difficulty tag and the next hours of weather (rain, ice, wind, heat). A thunderstorm makes it *Dangerous* whatever the score, and missing data gives *Unknown*, never *Easy*
-- `GET /difficulty?trail_id=wolf-trail`: the engine's answer for a trail right now (no AI)
-- **LLM tool calling**: the model asks for `find_trail`, `get_weather`, `get_elevation_gain` and `get_difficulty_score` and chains them on its own (e.g. finds the trail, then uses its id). Tool errors go back to the model as messages, never crashes, and a step limit stops runaway loops
-- **Swappable AI interface**: the app talks to one `LLMClient` shape; `LLM_PROVIDER` picks the model behind it. Runs locally on Ollama (`qwen3.5:9b`) for free
-- **Trail search** in OpenStreetMap: groups a trail's many path segments into one trail, adds up the length, and keeps the hardest difficulty tag
+**Web page**
+- At `/`: type a question or tap an example, watch a seconds counter while the AI works, then get a result card with the level colour-coded, the summary, reasons, warnings, gear tips and the time of the weather data
+- Friendly messages when something fails (AI not running, AI confused, question too short)
+- Works on phones and in dark mode. TypeScript + HTML + CSS, no framework. AI text is shown as plain text, never as HTML
+
+**AI**
+- **Tool calling**: the model picks from `find_trail`, `get_weather`, `get_elevation_gain` and `get_difficulty_score` and chains them on its own (finds the trail, then uses its id). Tool errors go back to the model as messages, and a step limit stops endless loops
+- **Structured output**: the final answer must be JSON matching a Pydantic schema (Ollama's `format` option). It's checked, and retried once with the error if it's invalid
+- **Engine wins**: the level, score and data time always come from the rules engine. A mismatch with the AI is logged
+- **Safety nets**: if the AI forgets the difficulty score or the weather, the app fetches them itself, so the answer always rests on real data
+- **Swappable AI**: the app talks to one `LLMClient` interface; `LLM_PROVIDER` picks the model behind it. Runs locally on Ollama (`qwen3.5:9b`) for free
+
+**Rules engine and data**
+- **Difficulty rules engine**: scores a trail 0–100 from its length, climb, OSM difficulty tag and the next hours of weather (rain, ice, wind, heat). A thunderstorm makes it *Dangerous* whatever the score
+- **Trail search** in OpenStreetMap: joins a trail's many path pieces into one trail, adds up the length, and keeps the hardest difficulty tag
 - **Local fallback** of real Gatineau Park trails, used automatically when Overpass is slow or down
-- **Live weather** for the trailhead: now, the past 6 hours (for ice) and the next 6 hours
+- **Live weather** at the trailhead: now, the past 6 hours (for ice) and the next 6 hours
 - **Elevation gain** along the trail, with requests batched and run in parallel
-- Settings come from `.env` (LLM provider, model, API URLs, timeouts)
+
+**API**
+- `POST /explain` with `{"question": "..."}`: the full answer as JSON
+- `GET /difficulty?trail_id=wolf-trail`: the rules engine only, no AI
+- `GET /health`, and auto-generated API docs at `/docs`
+- Settings come from `.env` (AI provider, model, API URLs, timeouts)
 
 ## Run it locally
 
-You need [uv](https://docs.astral.sh/uv/). It installs the right Python (3.12) for this project.
+You need:
+- [uv](https://docs.astral.sh/uv/), which installs the right Python (3.12) for this project
+- [Ollama](https://ollama.com) running, with the model pulled: `ollama pull qwen3.5:9b`
 
 ```powershell
 git clone https://github.com/PranavTiwari44/trailsense-ai.git
@@ -53,7 +80,11 @@ uv sync
 uv run uvicorn app.main:app --reload
 ```
 
-Then open [localhost:8000](http://localhost:8000) for the web page (needs [Ollama](https://ollama.com) running with `qwen3.5:9b`), or [localhost:8000/docs](http://localhost:8000/docs) for the API and try `POST /explain` with `{"question": "How hard is the Wolf Trail in Gatineau Park right now?"}` (needs Ollama running; takes 5–60 s).
+Then open:
+- [localhost:8000](http://localhost:8000) for the web page
+- [localhost:8000/docs](http://localhost:8000/docs) for the API (try `POST /explain`)
+
+An answer takes about 10–60 seconds on a local model.
 
 The compiled page script (`web/dist/app.js`) is committed, so you only need Node if you change `web/src/app.ts`:
 
@@ -63,7 +94,15 @@ npm install
 npm run build    # or: npm run watch, to rebuild on every save
 ```
 
-Run the tests with `uv run pytest` (94 tests, about a second). The AI is replaced by a scripted fake client, so the tests need no model, no internet and cost nothing. They cover the tool loop, the retry on invalid JSON, the engine overriding the AI's level, and the safety net when the AI skips the difficulty tool.
+## Tests
+
+```powershell
+uv run pytest    # 125 tests, about a second
+```
+
+The AI is replaced by a scripted fake client, so the tests need no model, no internet and cost nothing. They cover the rules engine, the data services (with faked HTTP), the tools, the tool loop, the retry on invalid JSON, the engine overriding the AI's level, both safety nets, the API endpoints, the web page files, and the eval checks themselves.
+
+## Try the pieces on their own
 
 Try the data services against the real APIs:
 
@@ -100,6 +139,21 @@ uv run python -m evals.run_evals hot-day    # just one
 The first run showed the model skipped `get_weather` in every scenario, so it couldn't mention light rain, snow or cold. Adding a code safety net (fetch the weather if the model didn't) fixed two of the three failures. The second run also caught the model writing "winds exceeding 60 km/h" when the data said 65: the invented-number check working as intended.
 
 The third run (a prompt asking for the weather in the summary and exact numbers) fixed both of those, but two others broke: with the summary focused on weather, the model left out "alpine" on an alpine route and forgot to state the level on another. Same score, different failures. A small model has limited room in one or two sentences, so the next step is a separate `conditions` field for the weather instead of squeezing everything into the summary.
+
+## Project layout
+
+```
+app/
+  main.py            web routes: the page, /explain, /difficulty, /health
+  models.py          data shapes (Pydantic): trail, weather, answers
+  engine/            the difficulty rules engine (plain functions, no web, no AI)
+  services/          Open-Meteo weather and elevation, OpenStreetMap trails + fallback
+  llm/               the AI side: interface, Ollama client, tools, the agent loop
+web/                 the web page: index.html, styles.css, src/app.ts -> dist/app.js
+evals/               18 fixed scenarios, the runner, and saved results per run
+tests/               unit tests (no model, no internet)
+scripts/             small scripts to try each piece by hand
+```
 
 ## Data
 
