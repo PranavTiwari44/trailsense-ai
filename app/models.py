@@ -75,7 +75,8 @@ class AIAnswer(BaseModel):
 
     trail_name: str | None = Field(description="The trail's name from find_trail, or null if no trail was found")
     level: Level = Field(description="Copy the level from get_difficulty_score. Unknown if it is missing")
-    summary: str = Field(description="One or two sentences explaining how hard the trail is right now, and why")
+    summary: str = Field(description="One or two sentences: the level, why, and the weather right now "
+                                     "(temperature, plus any rain, snow or strong wind)")
     reasons: list[str] = Field(description="Short facts from the tool results, e.g. '8.9 km long'")
     warnings: list[str] = Field(description="Dangers to watch for. Empty list if none")
     gear_tips: list[str] = Field(description="What to bring for these conditions")

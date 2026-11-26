@@ -15,6 +15,21 @@ client = TestClient(app)
 settings = get_settings()
 
 
+def test_home_page_is_the_web_page():
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "TrailSense" in response.text
+    assert "text/html" in response.headers["content-type"]
+
+
+def test_web_page_files_are_served():
+    assert client.get("/styles.css").status_code == 200
+    assert client.get("/logo.svg").status_code == 200
+    script = client.get("/app.js")
+    assert script.status_code == 200
+    assert "/explain" in script.text  # the compiled script calls our API
+
+
 def test_health_returns_ok():
     response = client.get("/health")
     assert response.status_code == 200

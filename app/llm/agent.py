@@ -91,9 +91,14 @@ async def run_agent(question: str, client: LLMClient, tools: list[ToolSpec],
 MAX_ANSWER_TRIES = 2
 
 FINAL_ANSWER_PROMPT = (
-    "Now write your final answer as JSON. Use only facts from the tool results above; "
-    "never make up numbers. Copy the level from get_difficulty_score (Unknown if it is missing). "
-    "Keep the summary to one or two sentences."
+    "Now write your final answer as JSON. Use only facts from the tool results above. "
+    "Copy the level from get_difficulty_score (Unknown if it is missing). "
+    "In the summary, say the level, then describe the weather right now from get_weather: "
+    "the temperature, and any rain, snow or strong wind, even light amounts. "
+    "If data is missing or the trail wasn't found, say so. Keep it to one or two sentences. "
+    "When you write a number, copy it exactly as it appears in the tool results; never round "
+    "or estimate it. Warnings: real dangers for these conditions. Gear tips: what to bring for "
+    "this weather and this trail."
 )
 
 

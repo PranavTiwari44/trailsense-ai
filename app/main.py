@@ -1,9 +1,10 @@
 """The web app: creates FastAPI and lists the URLs it answers."""
 
 import logging
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse
 
 from app.config import get_settings
 from app.llm.agent import AnswerError, explain
@@ -25,10 +26,33 @@ app = FastAPI(
 )
 
 
+# The web page's files. Only these four are served, so nothing else in web/ is exposed.
+WEB_DIR = Path(__file__).parent.parent / "web"
+LOGO_FILE = Path(__file__).parent.parent / "docs" / "trailsense-logo.svg"
+
+
 @app.get("/", include_in_schema=False)  # include_in_schema=False hides it from /docs
-def root() -> RedirectResponse:
-    """Send visitors of the home page to the API docs."""
-    return RedirectResponse(url="/docs")
+def home_page() -> FileResponse:
+    """The web page where people ask about a trail."""
+    return FileResponse(WEB_DIR / "index.html")
+
+
+@app.get("/styles.css", include_in_schema=False)
+def styles() -> FileResponse:
+    """The web page's styles."""
+    return FileResponse(WEB_DIR / "styles.css")
+
+
+@app.get("/app.js", include_in_schema=False)
+def script() -> FileResponse:
+    """The web page's script (compiled from web/src/app.ts)."""
+    return FileResponse(WEB_DIR / "dist" / "app.js", media_type="text/javascript")
+
+
+@app.get("/logo.svg", include_in_schema=False)
+def logo() -> FileResponse:
+    """The TrailSense logo, used on the page and as the browser tab icon."""
+    return FileResponse(LOGO_FILE, media_type="image/svg+xml")
 
 
 @app.get("/health")

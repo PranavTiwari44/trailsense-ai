@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TrailSense AI</title>
+  <meta name="description" content="Ask how hard a hiking trail is right now. Live weather, elevation and a tested rules engine.">
+  <link rel="icon" href="/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <img class="logo" src="/logo.svg" alt="TrailSense AI" width="270" height="72">
+      <p class="tagline">How hard is a trail <em>right now</em>? Live weather, elevation and trail data, scored by a tested rules engine and explained by AI.</p>
+    </header>
+
+    <main>
+      <form id="ask-form" class="ask" novalidate>
+        <label for="question" class="ask-label">Ask about a trail</label>
+        <div class="ask-row">
+          <input id="question" name="question" type="text" autocomplete="off"
+                 placeholder="How hard is the Wolf Trail in Gatineau Park right now?"
+                 minlength="3" maxlength="500" required>
+          <button id="ask-button" type="submit">Ask</button>
+        </div>
+        <div class="examples" aria-label="Example questions">
+          <span class="examples-label">Try:</span>
+          <button type="button" class="example">How hard is the Wolf Trail right now?</button>
+          <button type="button" class="example">Is King Mountain trail hard today?</button>
+          <button type="button" class="example">How hard is Pink Lake trail?</button>
+          <button type="button" class="example">How hard is Luskville Falls trail?</button>
+        </div>
+      </form>
+
+      <div id="loading" class="loading" hidden>
+        <span class="spinner" aria-hidden="true"></span>
+        <span id="loading-text">Checking the trail, weather and elevation…</span>
+      </div>
+
+      <div id="error" class="error" role="alert" hidden></div>
+
+      <article id="result" class="result" aria-live="polite" hidden>
+        <div class="result-top">
+          <div>
+            <p class="result-kicker">Difficulty right now</p>
+            <h2 id="trail-name" class="trail-name"></h2>
+          </div>
+          <div class="badge-box">
+            <span id="level" class="badge"></span>
+            <span id="score" class="score"></span>
+          </div>
+        </div>
+
+        <p id="summary" class="summary"></p>
+
+        <div class="lists">
+          <section id="reasons-box">
+            <h3>Why</h3>
+            <ul id="reasons"></ul>
+          </section>
+          <section id="warnings-box">
+            <h3>Watch out for</h3>
+            <ul id="warnings"></ul>
+          </section>
+          <section id="gear-box">
+            <h3>Bring</h3>
+            <ul id="gear"></ul>
+          </section>
+        </div>
+
+        <p id="data-time" class="data-time"></p>
+        <p id="note" class="note"></p>
+      </article>
+    </main>
+
+    <footer class="footer">
+      <p>The difficulty level comes from a rules engine, not the AI. Weather by Open-Meteo. Map data © OpenStreetMap contributors.</p>
+    </footer>
+  </div>
+</body>
+</html>

@@ -1,0 +1,266 @@
+/* TrailSense web page. Colours come from the logo: forest greens and a trail orange. */
+
+:root {
+  --bg: #f4f7f5;
+  --surface: #ffffff;
+  --text: #1c2a23;
+  --muted: #5b6b62;
+  --border: #d7e1db;
+  --brand: #245c43;
+  --brand-hover: #1b4733;
+  --accent: #f28c28;
+  --focus: #f28c28;
+
+  /* Difficulty colours: background + text, readable together */
+  --easy-bg: #dff3e6;     --easy-text: #1d6b3d;
+  --moderate-bg: #fdefd6; --moderate-text: #8a5300;
+  --hard-bg: #fde2dc;     --hard-text: #a3301b;
+  --danger-bg: #b3261e;   --danger-text: #ffffff;
+  --unknown-bg: #e6e9e7;  --unknown-text: #4a554f;
+
+  --error-bg: #fdecea;
+  --error-text: #8c1d18;
+  --radius: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111814;
+    --surface: #1a231e;
+    --text: #e6eee9;
+    --muted: #9fb0a6;
+    --border: #2c3a33;
+    --brand: #3e8e63;
+    --brand-hover: #4ea474;
+
+    --easy-bg: #17352a;     --easy-text: #8fdcaa;
+    --moderate-bg: #3a2c12; --moderate-text: #f5c26b;
+    --hard-bg: #3d1d17;     --hard-text: #f4a08f;
+    --danger-bg: #d0352b;   --danger-text: #ffffff;
+    --unknown-bg: #2a312d;  --unknown-text: #b9c4be;
+
+    --error-bg: #3b1c1a;
+    --error-text: #f6b8b2;
+  }
+}
+
+* { box-sizing: border-box; }
+
+/* Make the `hidden` attribute always win. Without this, rules like `.loading { display: flex }`
+   override it and hidden boxes stay on screen. */
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 32px 16px 48px;
+}
+
+/* ---------- Header ---------- */
+
+.header { text-align: center; margin-bottom: 28px; }
+.logo { max-width: 100%; height: auto; }
+.tagline { color: var(--muted); margin: 8px auto 0; max-width: 520px; }
+
+/* ---------- Question form ---------- */
+
+.ask {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.ask-label { display: block; font-weight: 600; margin-bottom: 8px; }
+
+.ask-row { display: flex; gap: 8px; }
+
+.ask-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 14px;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+#ask-button {
+  padding: 12px 22px;
+  font-weight: 600;
+  color: #ffffff;
+  background: var(--brand);
+  border: none;
+  border-radius: 10px;
+}
+
+#ask-button:hover { background: var(--brand-hover); }
+#ask-button:disabled { opacity: 0.6; cursor: wait; }
+
+input:focus-visible,
+button:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.examples {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.examples-label { color: var(--muted); font-size: 14px; margin-right: 2px; }
+
+.example {
+  padding: 5px 12px;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.example:hover { border-color: var(--brand); }
+
+/* ---------- Loading and errors ---------- */
+
+.loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding: 16px 20px;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 3s; }
+}
+
+.error {
+  margin-top: 20px;
+  padding: 16px 20px;
+  color: var(--error-text);
+  background: var(--error-bg);
+  border-radius: var(--radius);
+}
+
+/* ---------- Result card ---------- */
+
+.result {
+  margin-top: 20px;
+  padding: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.result-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.result-kicker {
+  margin: 0;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.trail-name { margin: 2px 0 0; font-size: 24px; line-height: 1.25; }
+
+.badge-box { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+
+.badge {
+  padding: 6px 14px;
+  font-weight: 700;
+  border-radius: 999px;
+}
+
+.badge.easy      { background: var(--easy-bg);     color: var(--easy-text); }
+.badge.moderate  { background: var(--moderate-bg); color: var(--moderate-text); }
+.badge.hard      { background: var(--hard-bg);     color: var(--hard-text); }
+.badge.dangerous { background: var(--danger-bg);   color: var(--danger-text); }
+.badge.unknown   { background: var(--unknown-bg);  color: var(--unknown-text); }
+
+.score { font-size: 14px; color: var(--muted); }
+
+.summary { font-size: 18px; margin: 16px 0 8px; }
+
+.lists {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.lists h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.lists ul { margin: 0; padding-left: 18px; }
+.lists li { margin-bottom: 4px; }
+
+.data-time { margin: 20px 0 0; font-size: 14px; color: var(--muted); }
+
+.note {
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  font-size: 14px;
+  border-left: 4px solid var(--accent);
+  background: var(--bg);
+  border-radius: 6px;
+}
+
+.footer { margin-top: 32px; text-align: center; font-size: 13px; color: var(--muted); }
+
+/* ---------- Phones ---------- */
+
+@media (max-width: 600px) {
+  .page { padding-top: 20px; }
+  .ask, .result { padding: 16px; }
+  .ask-row { flex-direction: column; }
+  .result-top { flex-direction: column; }
+  .badge-box { flex-direction: row; align-items: center; }
+  .lists { grid-template-columns: 1fr; }
+  .trail-name { font-size: 21px; }
+}

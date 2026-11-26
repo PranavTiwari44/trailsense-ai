@@ -1,0 +1,12 @@
+{
+  "name": "trailsense-web",
+  "private": true,
+  "description": "The TrailSense web page. TypeScript is only needed to build; the app serves the compiled JS.",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch"
+  },
+  "devDependencies": {
+    "typescript": "5.6.3"
+  }
+}

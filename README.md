@@ -14,8 +14,20 @@ A small FastAPI service where you ask about a hiking trail in plain English, lik
 
 > **Check official park conditions before hiking.** This app gives information, not safety guarantees.
 
+<table>
+  <tr>
+    <td width="68%"><img src="docs/screenshots/desktop-result.png" alt="TrailSense web page answering 'How hard is the Wolf Trail right now?': Moderate, score 35/100, with the live temperature and wind, the reasons and the safety note"></td>
+    <td width="32%"><img src="docs/screenshots/mobile-dark-result.png" alt="TrailSense on a phone in dark mode: King Mountain Trail, Easy, score 14/100"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Desktop: live weather, the engine's level and score, the AI's explanation</sub></td>
+    <td align="center"><sub>Phone, dark mode</sub></td>
+  </tr>
+</table>
+
 ## Features
 
+- **Web page** at `/` for normal people: ask a question or tap an example, see a loading counter while the AI works, then a result card with the level colour-coded, the summary, reasons, warnings, gear tips and the data time. Friendly messages when something fails, works on a phone and in dark mode. TypeScript + HTML + CSS, no framework
 - `POST /explain`: ask a question in plain English, get a structured JSON answer (level, score, summary, reasons, warnings, gear tips, data time). The AI writes the words; **the rules engine decides the level and score**, and overrides the AI if they disagree
 - **Structured output**: the AI must reply with JSON matching a Pydantic schema (Ollama's `format` option), validated and retried once if invalid. If the AI forgets to ask for the difficulty score, the app asks for it itself
 - `GET /health` health check, auto-generated API docs at `/docs`
@@ -41,7 +53,15 @@ uv sync
 uv run uvicorn app.main:app --reload
 ```
 
-Then open [localhost:8000/docs](http://localhost:8000/docs) and try `POST /explain` with `{"question": "How hard is the Wolf Trail in Gatineau Park right now?"}` (needs Ollama running; takes 5–60 s).
+Then open [localhost:8000](http://localhost:8000) for the web page (needs [Ollama](https://ollama.com) running with `qwen3.5:9b`), or [localhost:8000/docs](http://localhost:8000/docs) for the API and try `POST /explain` with `{"question": "How hard is the Wolf Trail in Gatineau Park right now?"}` (needs Ollama running; takes 5–60 s).
+
+The compiled page script (`web/dist/app.js`) is committed, so you only need Node if you change `web/src/app.ts`:
+
+```powershell
+cd web
+npm install
+npm run build    # or: npm run watch, to rebuild on every save
+```
 
 Run the tests with `uv run pytest` (94 tests, about a second). The AI is replaced by a scripted fake client, so the tests need no model, no internet and cost nothing. They cover the tool loop, the retry on invalid JSON, the engine overriding the AI's level, and the safety net when the AI skips the difficulty tool.
 
@@ -75,8 +95,11 @@ uv run python -m evals.run_evals hot-day    # just one
 |---|---|---|---|---|
 | First run | qwen3.5:9b (local) | 15/18 (83%) | 18/18 | 12.1 s |
 | + weather safety net | qwen3.5:9b (local) | 16/18 (89%) | 18/18 | 11.4 s |
+| + clearer final-answer prompt | qwen3.5:9b (local) | 16/18 (89%) | 18/18 | 12.9 s |
 
 The first run showed the model skipped `get_weather` in every scenario, so it couldn't mention light rain, snow or cold. Adding a code safety net (fetch the weather if the model didn't) fixed two of the three failures. The second run also caught the model writing "winds exceeding 60 km/h" when the data said 65: the invented-number check working as intended.
+
+The third run (a prompt asking for the weather in the summary and exact numbers) fixed both of those, but two others broke: with the summary focused on weather, the model left out "alpine" on an alpine route and forgot to state the level on another. Same score, different failures. A small model has limited room in one or two sentences, so the next step is a separate `conditions` field for the weather instead of squeezing everything into the summary.
 
 ## Data
 
@@ -91,4 +114,6 @@ Map data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright
 
 ## To do
 
-- A web page for asking questions (TypeScript)
+- A separate `conditions` field for the weather, so the summary has room for trail facts (see the third eval run)
+- An eval check for invented facts without numbers. Live runs showed the small model sometimes adds things that aren't in the data (a made-up "cold alert", "snow" when there was none, calling 11 km/h wind "strong"), which the current number and keyword checks don't catch
+- Optional: run the same evals with Claude and compare
