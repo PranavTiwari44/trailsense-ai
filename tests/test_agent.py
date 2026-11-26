@@ -2,13 +2,23 @@
 a FakeClient plays the AI, and run_tool is replaced with a fake.
 """
 
+import json
 import logging
 from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from app.llm import agent
-from app.llm.agent import build_response, run_agent, start_conversation
+from app.llm.agent import (
+    AnswerError,
+    ask_for_answer,
+    build_response,
+    explain,
+    find_tool_result,
+    get_engine_result,
+    run_agent,
+    start_conversation,
+)
 from app.llm.base import LLMResponse, Message, ToolCall, ToolSpec
 from app.models import SAFETY_NOTE, AIAnswer, DifficultyResult
 
@@ -199,3 +209,205 @@ def test_every_response_has_the_safety_note():
     response = build_response(make_ai_answer(), make_engine_result())
 
     assert response.note == SAFETY_NOTE
+
+
+# ---------- Milestone 7: retry, safety net, and the whole flow ----------
+
+# Realistic tool results, shaped like what our real tools return.
+TRAIL_RESULT = {"id": "wolf-trail", "name": "Wolf Trail", "length_km": 8.87, "sac_scale": "demanding_mountain_hiking",
+                "start_lat": 45.54, "start_lon": -75.93, "source": "fallback"}
+ENGINE_RESULT = {"score": 35, "level": "Moderate", "reasons": ["8.87 km long (+8)"],
+                 "data_time": "2026-11-25T10:00:00-05:00"}
+
+FIND_TRAIL_CALL = ToolCall(name="find_trail", arguments={"name": "Wolf Trail"})
+DIFFICULTY_CALL = ToolCall(name="get_difficulty_score", arguments={"trail_id": "wolf-trail"})
+
+GOOD_JSON = make_ai_answer().model_dump_json()  # a valid AIAnswer, as JSON text
+CUT_OFF_JSON = '{"trail_name": "Wolf Trail", "summary": "The trail is'  # the model stopped halfway
+MISSING_FIELDS_JSON = '{"trail_name": "Wolf Trail"}'  # valid JSON, but not a full AIAnswer
+
+
+class ToolRecorder:
+    """A fake run_tool that returns realistic results and remembers which tools were run."""
+
+    def __init__(self):
+        """Start with no tools run."""
+        self.names_run: list[str] = []
+
+    async def run_tool(self, call: ToolCall) -> str:
+        """Remember the tool's name and return a realistic result for it."""
+        self.names_run.append(call.name)
+        if call.name == "find_trail":
+            return json.dumps(TRAIL_RESULT)
+        if call.name == "get_difficulty_score":
+            return json.dumps(ENGINE_RESULT)
+        return json.dumps({"error": f"no fake result for {call.name}"})
+
+
+@pytest.fixture
+def recorder(monkeypatch):
+    """Use ToolRecorder instead of the simple fake tools, for tests that need real-looking results."""
+    tool_recorder = ToolRecorder()
+    monkeypatch.setattr(agent, "run_tool", tool_recorder.run_tool)
+    return tool_recorder
+
+
+def tool_message(tool_name: str, result: dict) -> Message:
+    """A tool result message, as our loop would add it."""
+    return Message(role="tool", content=json.dumps(result), tool_name=tool_name)
+
+
+# --- find_tool_result ---
+
+def test_find_tool_result_gives_the_newest_successful_result():
+    messages = [
+        tool_message("get_difficulty_score", {"score": 10, "level": "Easy"}),
+        tool_message("get_difficulty_score", {"score": 35, "level": "Moderate"}),
+    ]
+
+    assert find_tool_result(messages, "get_difficulty_score")["score"] == 35
+
+
+def test_find_tool_result_skips_errors():
+    messages = [
+        tool_message("find_trail", TRAIL_RESULT),
+        tool_message("find_trail", {"error": "Overpass is down"}),  # newer, but failed
+    ]
+
+    assert find_tool_result(messages, "find_trail")["id"] == "wolf-trail"
+
+
+def test_find_tool_result_is_none_when_the_tool_was_never_called():
+    messages = [tool_message("find_trail", TRAIL_RESULT)]
+
+    assert find_tool_result(messages, "get_difficulty_score") is None
+
+
+# --- get_engine_result (the safety net) ---
+
+async def test_uses_the_engine_result_the_ai_already_asked_for(recorder):
+    messages = [tool_message("find_trail", TRAIL_RESULT), tool_message("get_difficulty_score", ENGINE_RESULT)]
+
+    engine = await get_engine_result(messages)
+
+    assert engine.level == "Moderate"
+    assert recorder.names_run == []  # no extra tool call needed
+
+
+async def test_calls_get_difficulty_score_itself_when_the_ai_forgot(recorder, caplog):
+    caplog.set_level(logging.WARNING)
+    messages = [tool_message("find_trail", TRAIL_RESULT)]  # the AI found the trail, then stopped
+
+    engine = await get_engine_result(messages)
+
+    assert engine.level == "Moderate"
+    assert recorder.names_run == ["get_difficulty_score"]
+    assert "never called get_difficulty_score" in caplog.text
+    # The request is added BEFORE its result, as if the AI had asked.
+    assert messages[-2].role == "assistant"
+    assert messages[-2].tool_calls == [DIFFICULTY_CALL]
+    assert messages[-1].role == "tool"
+    assert messages[-1].tool_name == "get_difficulty_score"
+
+
+async def test_no_trail_found_means_no_engine_result(recorder):
+    messages = [tool_message("find_trail", {"error": "No trail found matching 'Narnia Loop'"})]
+
+    engine = await get_engine_result(messages)
+
+    assert engine is None
+    assert recorder.names_run == []  # no trail id, so nothing to ask the engine about
+
+
+# --- ask_for_answer (structured output + retry) ---
+
+async def test_valid_json_on_the_first_try():
+    client = FakeClient(replies=[], json_replies=[GOOD_JSON])
+
+    answer = await ask_for_answer(client, start_conversation("Wolf Trail?"))
+
+    assert answer.trail_name == "Wolf Trail"
+    assert len(client.conversations_seen) == 1  # no retry needed
+
+
+@pytest.mark.parametrize("bad_json", [CUT_OFF_JSON, MISSING_FIELDS_JSON])
+async def test_invalid_json_then_valid_on_the_retry(bad_json):
+    client = FakeClient(replies=[], json_replies=[bad_json, GOOD_JSON])
+
+    answer = await ask_for_answer(client, start_conversation("Wolf Trail?"))
+
+    assert answer.summary == "Moderate: 8.9 km with 360 m of climb."
+    # On the retry, the AI sees its own bad answer and what was wrong with it.
+    retry = client.conversations_seen[1]
+    assert retry[-2].role == "assistant"
+    assert retry[-2].content == bad_json
+    assert retry[-1].role == "user"
+    assert "not valid" in retry[-1].content
+
+
+async def test_invalid_json_twice_gives_up_with_answer_error():
+    client = FakeClient(replies=[], json_replies=[CUT_OFF_JSON, MISSING_FIELDS_JSON])
+
+    with pytest.raises(AnswerError):
+        await ask_for_answer(client, start_conversation("Wolf Trail?"))
+
+    assert len(client.conversations_seen) == 2  # one try + one retry, then stop
+
+
+# --- explain: the whole flow, with no model at all ---
+
+async def test_explain_engine_overrides_the_ai_level(recorder, caplog):
+    caplog.set_level(logging.WARNING)
+    client = FakeClient(
+        replies=[
+            LLMResponse(tool_calls=[FIND_TRAIL_CALL]),
+            LLMResponse(tool_calls=[DIFFICULTY_CALL]),
+            LLMResponse(text="It's easy!"),
+        ],
+        json_replies=[make_ai_answer(level="Easy").model_dump_json()],  # the AI says Easy...
+    )
+
+    response = await explain("How hard is Wolf Trail?", client)
+
+    assert response.level == "Moderate"  # ...but the engine said Moderate, and the engine wins
+    assert response.score == 35
+    assert "mismatch" in caplog.text
+
+
+async def test_explain_when_the_ai_never_calls_get_difficulty_score(recorder):
+    client = FakeClient(
+        replies=[
+            LLMResponse(tool_calls=[FIND_TRAIL_CALL]),
+            LLMResponse(text="Looks fine to me."),  # skipped the difficulty tool
+        ],
+        json_replies=[GOOD_JSON],
+    )
+
+    response = await explain("How hard is Wolf Trail?", client)
+
+    assert recorder.names_run == ["find_trail", "get_difficulty_score"]  # our code filled the gap
+    assert response.level == "Moderate"
+    assert response.score == 35
+    # The AI's final JSON call could see the engine's result.
+    final_call = client.conversations_seen[-1]
+    tool_names = []
+    for message in final_call:
+        tool_names.append(message.tool_name)
+    assert "get_difficulty_score" in tool_names
+
+
+async def test_explain_unknown_trail_is_unknown(monkeypatch):
+    async def trail_not_found(call: ToolCall) -> str:
+        return json.dumps({"error": "No trail found matching 'Narnia Loop'"})
+
+    monkeypatch.setattr(agent, "run_tool", trail_not_found)
+    client = FakeClient(
+        replies=[LLMResponse(tool_calls=[ToolCall(name="find_trail", arguments={"name": "Narnia Loop"})]),
+                 LLMResponse(text="I couldn't find it.")],
+        json_replies=[make_ai_answer(level="Easy").model_dump_json()],  # a confused AI says Easy
+    )
+
+    response = await explain("How hard is the Narnia Loop?", client)
+
+    assert response.level == "Unknown"  # never Easy when data is missing
+    assert response.score is None

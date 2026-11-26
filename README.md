@@ -43,7 +43,7 @@ uv run uvicorn app.main:app --reload
 
 Then open [localhost:8000/docs](http://localhost:8000/docs) and try `POST /explain` with `{"question": "How hard is the Wolf Trail in Gatineau Park right now?"}` (needs Ollama running; takes 5–60 s).
 
-Run the tests with `uv run pytest`.
+Run the tests with `uv run pytest` (94 tests, about a second). The AI is replaced by a scripted fake client, so the tests need no model, no internet and cost nothing. They cover the tool loop, the retry on invalid JSON, the engine overriding the AI's level, and the safety net when the AI skips the difficulty tool.
 
 Try the data services against the real APIs:
 
@@ -70,5 +70,5 @@ Map data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright
 
 ## To do
 
-- More agent tests with a fake LLM client (retry, safety net), and an eval set
+- An eval set that runs fixed scenarios through the real model and scores the answers
 - A web page for asking questions (TypeScript)
