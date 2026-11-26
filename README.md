@@ -136,10 +136,13 @@ uv run python -m evals.run_evals hot-day    # just one
 | First run | qwen3.5:9b (local) | 15/18 (83%) | 18/18 | 12.1 s |
 | + weather safety net | qwen3.5:9b (local) | 16/18 (89%) | 18/18 | 11.4 s |
 | + clearer final-answer prompt | qwen3.5:9b (local) | 16/18 (89%) | 18/18 | 12.9 s |
+| + nudge to use tools, parking scenario | qwen3.5:9b (local) | 17/19 (89%) | 19/19 | 12.9 s |
 
 The first run showed the model skipped `get_weather` in every scenario, so it couldn't mention light rain, snow or cold. Adding a code safety net (fetch the weather if the model didn't) fixed two of the three failures. The second run also caught the model writing "winds exceeding 60 km/h" when the data said 65: the invented-number check working as intended.
 
-The third run (a prompt asking for the weather in the summary and exact numbers) fixed both of those, but two others broke: with the summary focused on weather, the model left out "alpine" on an alpine route and forgot to state the level on another. Same score, different failures. A small model has limited room in one or two sentences, so the next step is a separate `conditions` field for the weather instead of squeezing everything into the summary.
+The third run (a prompt asking for the weather in the summary and exact numbers) fixed both of those, but two others broke: with the summary focused on weather, the model left out "alpine" on an alpine route and forgot to state the level on another. Same score, different failures. A small model has limited room in one or two sentences.
+
+The fourth run added a parking question. It passes: the app still gives the difficulty and says it can't check parking. "wet-but-above-freezing" now passes too. The two failures left are the same kind as before: the summary describes the weather but leaves out the trail's main risk (ice on an icy trail, "alpine" on an alpine route).
 
 ## Project layout
 
