@@ -16,6 +16,8 @@ A small FastAPI service where you ask about a hiking trail in plain English, lik
 
 ## Features
 
+- `POST /explain`: ask a question in plain English, get a structured JSON answer (level, score, summary, reasons, warnings, gear tips, data time). The AI writes the words; **the rules engine decides the level and score**, and overrides the AI if they disagree
+- **Structured output**: the AI must reply with JSON matching a Pydantic schema (Ollama's `format` option), validated and retried once if invalid. If the AI forgets to ask for the difficulty score, the app asks for it itself
 - `GET /health` health check, auto-generated API docs at `/docs`
 - **Difficulty rules engine**: scores a trail 0–100 from its length, climb, OSM difficulty tag and the next hours of weather (rain, ice, wind, heat). A thunderstorm makes it *Dangerous* whatever the score, and missing data gives *Unknown*, never *Easy*
 - `GET /difficulty?trail_id=wolf-trail`: the engine's answer for a trail right now (no AI)
@@ -39,7 +41,7 @@ uv sync
 uv run uvicorn app.main:app --reload
 ```
 
-Then open [localhost:8000/docs](http://localhost:8000/docs).
+Then open [localhost:8000/docs](http://localhost:8000/docs) and try `POST /explain` with `{"question": "How hard is the Wolf Trail in Gatineau Park right now?"}` (needs Ollama running; takes 5–60 s).
 
 Run the tests with `uv run pytest`.
 
@@ -68,5 +70,5 @@ Map data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright
 
 ## To do
 
-- `POST /explain` with structured JSON output
-- Agent tests with a fake LLM client, and an eval set
+- More agent tests with a fake LLM client (retry, safety net), and an eval set
+- A web page for asking questions (TypeScript)

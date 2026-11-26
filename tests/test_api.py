@@ -4,8 +4,12 @@ import httpx
 import respx
 from fastapi.testclient import TestClient
 
+from app import main
 from app.config import get_settings
+from app.llm.agent import AnswerError
+from app.llm.base import LLMError
 from app.main import app
+from app.models import SAFETY_NOTE, ExplainResponse
 
 client = TestClient(app)
 settings = get_settings()
@@ -37,3 +41,54 @@ def test_difficulty_is_unknown_when_weather_and_elevation_are_down():
     body = response.json()
     assert body["level"] == "Unknown"
     assert body["score"] is None
+
+
+# ---------- POST /explain (the AI part is faked, so no model is needed) ----------
+
+def fake_answer() -> ExplainResponse:
+    """A finished answer, as if the whole agent had run."""
+    return ExplainResponse(trail_name="Wolf Trail", level="Moderate", score=35,
+                           summary="Moderate: 8.9 km with 360 m of climb.", reasons=["8.9 km long"],
+                           warnings=[], gear_tips=["Water"], data_time=None)
+
+
+def test_explain_returns_the_answer_as_json(monkeypatch):
+    async def fake_explain(question, llm_client):
+        return fake_answer()
+
+    monkeypatch.setattr(main, "explain", fake_explain)
+
+    response = client.post("/explain", json={"question": "How hard is Wolf Trail?"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["level"] == "Moderate"
+    assert body["note"] == SAFETY_NOTE  # every answer carries the safety note
+
+
+def test_explain_says_503_when_the_ai_is_down(monkeypatch):
+    async def broken_explain(question, llm_client):
+        raise LLMError("Failed to connect to Ollama")
+
+    monkeypatch.setattr(main, "explain", broken_explain)
+
+    response = client.post("/explain", json={"question": "How hard is Wolf Trail?"})
+
+    assert response.status_code == 503
+
+
+def test_explain_says_502_when_the_ai_gives_no_valid_answer(monkeypatch):
+    async def confused_explain(question, llm_client):
+        raise AnswerError("No valid answer after 2 tries")
+
+    monkeypatch.setattr(main, "explain", confused_explain)
+
+    response = client.post("/explain", json={"question": "How hard is Wolf Trail?"})
+
+    assert response.status_code == 502
+
+
+def test_explain_rejects_a_too_short_question():
+    response = client.post("/explain", json={"question": "hi"})
+
+    assert response.status_code == 422  # min_length=3 on ExplainRequest

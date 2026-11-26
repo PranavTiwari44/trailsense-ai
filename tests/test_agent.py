@@ -3,12 +3,14 @@ a FakeClient plays the AI, and run_tool is replaced with a fake.
 """
 
 import logging
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from app.llm import agent
-from app.llm.agent import run_agent, start_conversation
+from app.llm.agent import build_response, run_agent, start_conversation
 from app.llm.base import LLMResponse, Message, ToolCall, ToolSpec
+from app.models import SAFETY_NOTE, AIAnswer, DifficultyResult
 
 WEATHER_CALL = ToolCall(name="get_weather", arguments={"lat": 45.5, "lon": -75.9})
 SOME_TOOLS = [ToolSpec(name="get_weather", description="Weather at a spot", parameters={"type": "object"})]
@@ -18,9 +20,10 @@ class FakeClient:
     """A pretend AI for tests. Gives back replies we wrote in advance, in order,
     and remembers every conversation it was sent."""
 
-    def __init__(self, replies: list[LLMResponse]):
-        """Store the replies to hand out, one per call."""
+    def __init__(self, replies: list[LLMResponse], json_replies: list[str] | None = None):
+        """Store the replies to hand out, one per call. json_replies are for chat_json."""
         self.replies = replies
+        self.json_replies = json_replies or []
         self.conversations_seen: list[list[Message]] = []
         self.tools_seen: list[ToolSpec] = []
 
@@ -31,6 +34,11 @@ class FakeClient:
         self.conversations_seen.append(list(messages))
         self.tools_seen = tools
         return self.replies.pop(0)
+
+    async def chat_json(self, messages: list[Message], schema: dict) -> str:
+        """Remember what we were sent, then give back the next scripted JSON text."""
+        self.conversations_seen.append(list(messages))
+        return self.json_replies.pop(0)
 
 
 @pytest.fixture(autouse=True)
@@ -127,3 +135,67 @@ async def test_logs_each_tool_it_runs(caplog):
 
     assert "get_weather" in caplog.text
     assert "45.5" in caplog.text  # the inputs are logged too
+
+
+# ---------- build_response: the engine always wins (Milestone 6) ----------
+
+DATA_TIME = datetime(2026, 11, 25, 10, 0, tzinfo=timezone(timedelta(hours=-5)))
+
+
+def make_ai_answer(level: str = "Moderate") -> AIAnswer:
+    """What the AI might write at the end. Only the level changes between tests."""
+    return AIAnswer(trail_name="Wolf Trail", level=level, summary="Moderate: 8.9 km with 360 m of climb.",
+                    reasons=["8.9 km long"], warnings=["Rocky sections"], gear_tips=["Water"])
+
+
+def make_engine_result(level: str = "Moderate", score: int | None = 35) -> DifficultyResult:
+    """What the rules engine might decide."""
+    return DifficultyResult(score=score, level=level, reasons=["8.87 km long (+8)"], data_time=DATA_TIME)
+
+
+def test_engine_level_wins_when_the_ai_disagrees(caplog):
+    caplog.set_level(logging.WARNING)
+
+    response = build_response(make_ai_answer(level="Easy"), make_engine_result(level="Hard", score=55))
+
+    assert response.level == "Hard"
+    assert "Easy" in caplog.text and "Hard" in caplog.text  # the mismatch is logged
+
+
+def test_score_and_data_time_come_from_the_engine():
+    response = build_response(make_ai_answer(), make_engine_result(score=35))
+
+    assert response.score == 35
+    assert response.data_time == DATA_TIME
+
+
+def test_the_words_come_from_the_ai():
+    response = build_response(make_ai_answer(), make_engine_result())
+
+    assert response.trail_name == "Wolf Trail"
+    assert response.summary == "Moderate: 8.9 km with 360 m of climb."
+    assert response.reasons == ["8.9 km long"]
+    assert response.warnings == ["Rocky sections"]
+    assert response.gear_tips == ["Water"]
+
+
+def test_no_engine_result_means_unknown_even_if_the_ai_says_easy():
+    response = build_response(make_ai_answer(level="Easy"), None)
+
+    assert response.level == "Unknown"
+    assert response.score is None
+    assert response.data_time is None
+
+
+def test_no_warning_when_the_ai_and_engine_agree(caplog):
+    caplog.set_level(logging.WARNING)
+
+    build_response(make_ai_answer(level="Moderate"), make_engine_result(level="Moderate"))
+
+    assert caplog.text == ""
+
+
+def test_every_response_has_the_safety_note():
+    response = build_response(make_ai_answer(), make_engine_result())
+
+    assert response.note == SAFETY_NOTE

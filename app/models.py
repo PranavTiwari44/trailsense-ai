@@ -63,6 +63,45 @@ class DifficultyResult(BaseModel):
     data_time: datetime | None  # time of the weather reading used; None if there was no weather
 
 
+SAFETY_NOTE = "Check official park conditions before hiking. This is information, not a safety guarantee."
+
+
+class AIAnswer(BaseModel):
+    """What the AI writes at the end: the words only.
+
+    We show this shape to the AI as a JSON Schema and it must reply in exactly
+    this shape. The numbers (score, data time) are added by our code later.
+    """
+
+    trail_name: str | None = Field(description="The trail's name from find_trail, or null if no trail was found")
+    level: Level = Field(description="Copy the level from get_difficulty_score. Unknown if it is missing")
+    summary: str = Field(description="One or two sentences explaining how hard the trail is right now, and why")
+    reasons: list[str] = Field(description="Short facts from the tool results, e.g. '8.9 km long'")
+    warnings: list[str] = Field(description="Dangers to watch for. Empty list if none")
+    gear_tips: list[str] = Field(description="What to bring for these conditions")
+
+
+class ExplainResponse(BaseModel):
+    """The final answer POST /explain sends back: the AI's words plus the rules engine's numbers."""
+
+    trail_name: str | None
+    level: Level  # always the rules engine's level, never the AI's
+    score: int | None  # from the rules engine; None when the level is "Unknown"
+    summary: str
+    reasons: list[str]
+    warnings: list[str]
+    gear_tips: list[str]
+    data_time: datetime | None  # time of the weather reading the engine used
+    note: str = SAFETY_NOTE
+
+
+class ExplainRequest(BaseModel):
+    """What someone sends to POST /explain: their question."""
+
+    question: str = Field(min_length=3, max_length=500,
+                          examples=["How hard is the Wolf Trail in Gatineau Park right now?"])
+
+
 class ElevationProfile(BaseModel):
     """How much climbing a trail has, plus its lowest and highest points."""
 

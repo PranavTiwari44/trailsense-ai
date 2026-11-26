@@ -33,6 +33,19 @@ class OllamaClient:
             raise LLMError(f"Ollama call failed ({self.model}): {error}") from error
         return from_ollama_message(response.message)
 
+    async def chat_json(self, messages: list[Message], schema: dict[str, Any]) -> str:
+        """Send the conversation and force Ollama to reply with JSON in the shape of `schema`."""
+        try:
+            response = await self.client.chat(
+                model=self.model,
+                messages=to_ollama_messages(messages),
+                format=schema,  # Ollama only lets the model write JSON that fits this schema
+                think=self.think,
+            )
+        except (ResponseError, httpx.HTTPError, ConnectionError) as error:
+            raise LLMError(f"Ollama call failed ({self.model}): {error}") from error
+        return response.message.content or ""
+
 
 # ---------- Converting between our shapes and Ollama's ----------
 

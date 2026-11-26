@@ -58,3 +58,11 @@ class LLMClient(Protocol):
     async def chat(self, messages: list[Message], tools: list[ToolSpec]) -> LLMResponse:
         """Send the conversation and the available tools; get the AI's next reply."""
         ...
+
+    async def chat_json(self, messages: list[Message], schema: dict[str, Any]) -> str:
+        """Send the conversation and get back JSON text that should match the given JSON Schema.
+
+        Each AI does this its own way (Ollama: the "format" option; Claude later: a
+        submit_answer tool), so the agent never needs to know how.
+        """
+        ...
