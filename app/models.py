@@ -82,6 +82,16 @@ class AIAnswer(BaseModel):
     gear_tips: list[str] = Field(description="What to bring for these conditions")
 
 
+class ScopeCheck(BaseModel):
+    """The AI's answer to one small question: does the person ask for something this app can't check?"""
+
+    other_topic: str | None = Field(
+        description="The other topic in 1 to 3 words, like \"parking\" or \"dogs\". "
+                    "null if the question only asks how hard the trail is, about its conditions or "
+                    "weather, or what to bring"
+    )
+
+
 class ExplainResponse(BaseModel):
     """The final answer POST /explain sends back: the AI's words plus the rules engine's numbers."""
 
@@ -93,6 +103,7 @@ class ExplainResponse(BaseModel):
     warnings: list[str]
     gear_tips: list[str]
     data_time: datetime | None  # time of the weather reading the engine used
+    question_note: str | None = None  # e.g. "I can't check parking." when the question was about something else
     note: str = SAFETY_NOTE
 
 

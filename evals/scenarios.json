@@ -155,6 +155,15 @@
       "must_mention": ["cold|-8"]
     },
     {
+      "id": "off-topic-parking",
+      "question": "Is there parking at the Wolf Trail?",
+      "trail": {"id": "wolf-trail", "name": "Wolf Trail", "length_km": 8.87, "sac_scale": "demanding_mountain_hiking"},
+      "climb_m": 360,
+      "weather": {"temp_c": 9, "weather_code": 1},
+      "expected_level": "Moderate",
+      "must_mention": ["parking"]
+    },
+    {
       "id": "wet-but-above-freezing",
       "question": "How hard is Willow Creek Trail right now?",
       "trail": {"id": "willow-creek-trail", "name": "Willow Creek Trail", "length_km": 6, "sac_scale": "hiking"},

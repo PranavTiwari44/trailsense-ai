@@ -25,7 +25,7 @@
                  minlength="3" maxlength="500" required aria-describedby="ask-hint">
           <button id="ask-button" type="submit">Ask</button>
         </div>
-        <p id="ask-hint" class="ask-hint">Searches Ottawa–Gatineau by default. Somewhere else? Add the city, like “the Beltline Trail <strong>in Toronto</strong>”.</p>
+        <p id="ask-hint" class="ask-hint">Ask how hard a trail is right now: difficulty, weather and what to bring. Searches Ottawa–Gatineau by default. Somewhere else? Add the city, like “the Beltline Trail <strong>in Toronto</strong>”.</p>
         <div class="examples" aria-label="Example questions">
           <span class="examples-label">Try:</span>
           <button type="button" class="example">How hard is the Wolf Trail right now?</button>
@@ -44,6 +44,7 @@
       <div id="error" class="error" role="alert" hidden></div>
 
       <article id="result" class="result" aria-live="polite" hidden>
+        <p id="question-note" class="question-note" hidden></p>
         <div class="result-top">
           <div>
             <p class="result-kicker">Difficulty right now</p>

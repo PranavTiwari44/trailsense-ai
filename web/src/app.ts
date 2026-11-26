@@ -14,6 +14,7 @@ interface ExplainResponse {
   warnings: string[];
   gear_tips: string[];
   data_time: string | null;
+  question_note: string | null; // set when the question was about something we can't check
   note: string;
 }
 
@@ -109,6 +110,11 @@ function formatDataTime(text: string | null): string {
 
 /** Put the answer on the page. */
 function showResult(answer: ExplainResponse): void {
+  // If they asked about something we can't check (like parking), say so first.
+  const questionNote = getElement("question-note");
+  questionNote.textContent = answer.question_note ?? "";
+  questionNote.hidden = answer.question_note === null;
+
   getElement("trail-name").textContent = answer.trail_name ?? "Trail not found";
 
   const badge = getElement("level");

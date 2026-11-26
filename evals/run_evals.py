@@ -24,17 +24,10 @@ from pydantic import BaseModel
 from app.config import get_settings
 from app.engine.difficulty import score_difficulty
 from app.llm import tools
-from app.llm.agent import (
-    AnswerError,
-    add_weather_if_missing,
-    ask_for_answer,
-    build_response,
-    get_engine_result,
-    run_agent,
-)
+from app.llm.agent import AnswerError, explain_with_details
 from app.llm.base import LLMClient, LLMError, Message
 from app.llm.factory import get_llm_client
-from app.llm.tools import TOOL_SPECS, FindTrailInput, GetWeatherInput, TrailIdInput
+from app.llm.tools import FindTrailInput, GetWeatherInput, TrailIdInput
 from app.models import Level, TrailInfo, Weather, WeatherHour
 from app.services.errors import DataUnavailableError, TrailNotFoundError
 
@@ -274,19 +267,17 @@ async def run_scenario(scenario: Scenario, client: LLMClient) -> ScenarioResult:
     result = ScenarioResult(id=scenario.id, expected_level=scenario.expected_level)
     started = time.perf_counter()
 
-    # The same steps as explain() in agent.py, kept separate so we can see the AI's own level.
-    agent_result = await run_agent(scenario.question, client, TOOL_SPECS)
-    messages = agent_result.messages
-    await add_weather_if_missing(messages)
-    engine = await get_engine_result(messages)
-    result.tools = tools_called(messages)
+    # The same code path as POST /explain, but keeping the AI's own answer and the conversation.
     try:
-        answer = await ask_for_answer(client, messages)
+        run = await explain_with_details(scenario.question, client)
     except AnswerError:
         result.seconds = time.perf_counter() - started
         return result  # valid_json stays False, so the scenario fails
 
-    response = build_response(answer, engine)
+    response = run.response
+    answer = run.ai_answer
+    messages = run.messages
+    result.tools = tools_called(messages)
     result.seconds = time.perf_counter() - started
     result.valid_json = True
     result.level = response.level
@@ -298,6 +289,8 @@ async def run_scenario(scenario: Scenario, client: LLMClient) -> ScenarioResult:
     result.invented = invented_numbers(response.summary, tool_data_text(messages))
 
     answer_parts = [response.summary] + response.reasons + response.warnings + response.gear_tips
+    if response.question_note:
+        answer_parts.append(response.question_note)
     result.missing = missing_words(" ".join(answer_parts), scenario.must_mention)
 
     result.passed = result.level_ok and not result.invented and not result.missing

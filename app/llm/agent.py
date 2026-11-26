@@ -12,7 +12,7 @@ from pydantic import BaseModel, ValidationError
 
 from app.llm.base import LLMClient, Message, ToolCall, ToolSpec
 from app.llm.tools import TOOL_SPECS, run_tool
-from app.models import AIAnswer, DifficultyResult, ExplainResponse
+from app.models import AIAnswer, DifficultyResult, ExplainResponse, ScopeCheck
 
 logger = logging.getLogger(__name__)
 
@@ -23,10 +23,19 @@ SYSTEM_PROMPT = (
     "You are a hiking-conditions assistant. "
     "Always use the tools to get facts. Never make up numbers. "
     "For a trail, call find_trail first: it gives the trail id and start location the other tools need. "
+    "If the question is about something your tools can't check (like parking or opening hours), "
+    "still look up the trail and its difficulty, so you can say what you do know. "
     "Call get_weather at the trail's start so you can describe the conditions. "
     "The difficulty level must come from get_difficulty_score, never from your own judgement. "
     "If a tool returns an error or data is missing, say so and call the level Unknown. "
     "Keep your answer to one or two short sentences."
+)
+
+
+# Sent once if the AI tries to answer without using any tools.
+NUDGE_TO_USE_TOOLS = (
+    "Before answering, use your tools: call find_trail for the trail in the question, then "
+    "get_difficulty_score. Then answer what you can, and say clearly what you can't check."
 )
 
 
@@ -68,6 +77,8 @@ async def run_agent(question: str, client: LLMClient, tools: list[ToolSpec],
     add the results to the conversation and go again. If it answers with text, we're done.
     """
     messages = start_conversation(question)
+    used_a_tool = False
+    nudged = False
     for _ in range(max_steps):
         response = await client.chat(messages, tools)
 
@@ -75,9 +86,19 @@ async def run_agent(question: str, client: LLMClient, tools: list[ToolSpec],
         content = response.text or ""  # text is None when the AI only asks for tools
         messages.append(Message(role="assistant", content=content, tool_calls=response.tool_calls))
 
+        # Small models sometimes answer straight away without looking anything up
+        # (e.g. "my tools can't check parking"). Nudge them once to use the tools.
+        if not response.tool_calls and not used_a_tool and not nudged:
+            logger.warning("The AI answered without using any tools; asking it to look the trail up")
+            messages.append(Message(role="user", content=NUDGE_TO_USE_TOOLS))
+            nudged = True
+            continue
+
         # No tools requested means this is the final answer.
         if not response.tool_calls:
             return AgentResult(answer=response.text, messages=messages)
+
+        used_a_tool = True
 
         messages.extend(await run_tool_calls(response.tool_calls))
 
@@ -98,8 +119,25 @@ FINAL_ANSWER_PROMPT = (
     "If data is missing or the trail wasn't found, say so. Keep it to one or two sentences. "
     "When you write a number, copy it exactly as it appears in the tool results; never round "
     "or estimate it. Warnings: real dangers for these conditions. Gear tips: what to bring for "
-    "this weather and this trail."
+    "this weather and this trail. Never guess anything the tools didn't give you."
 )
+
+# The small separate check for questions about things we can't look up (like parking).
+# Examples help small models far more than descriptions do.
+SCOPE_PROMPT = """You read a hiking question and find any topic this app can't answer.
+The app CAN answer: how hard a trail is, its length and climb, the conditions and weather, and what to bring.
+Anything else is an other_topic. Reply with JSON only.
+
+Examples:
+"How hard is the Wolf Trail right now?" -> {"other_topic": null}
+"Is it icy on King Mountain today?" -> {"other_topic": null}
+"What should I bring for Pink Lake trail?" -> {"other_topic": null}
+"Is there parking at the Beltline Trail?" -> {"other_topic": "parking"}
+"Can I bring my dog on Wolf Trail?" -> {"other_topic": "dogs"}
+"When does Luskville Falls trail open, and is it hard?" -> {"other_topic": "opening hours"}"""
+
+# The longest topic we accept. Anything longer means the AI misunderstood the job.
+MAX_TOPIC_WORDS = 3
 
 
 class AnswerError(Exception):
@@ -219,10 +257,58 @@ def build_response(answer: AIAnswer, engine: DifficultyResult | None) -> Explain
     return ExplainResponse(trail_name=answer.trail_name, level=level, score=score, summary=answer.summary, reasons=answer.reasons, warnings=answer.warnings, gear_tips=answer.gear_tips, data_time=data_time)
 
 
-async def explain(question: str, client: LLMClient) -> ExplainResponse:
-    """Answer a trail question from start to finish: tools, then the engine's result, then the JSON answer."""
+async def check_question_scope(client: LLMClient, question: str) -> str | None:
+    """Ask the AI, in a separate small call, whether the question wants something we can't check.
+
+    Returns a note like "I can't check parking, but here's how hard the trail is right now.",
+    or None. The AI only names the topic; our code writes the sentence, so it's always clear.
+    A bad reply here just means no note; it never fails the whole answer.
+    """
+    messages = [
+        Message(role="system", content=SCOPE_PROMPT),
+        Message(role="user", content=f"Question: {question}"),
+    ]
+    text = await client.chat_json(messages, ScopeCheck.model_json_schema())
+    try:
+        topic = ScopeCheck.model_validate_json(text).other_topic
+    except ValidationError as error:
+        logger.warning(f"The question check gave invalid JSON, so no note: {error}")
+        return None
+
+    if not topic:
+        return None
+    topic = topic.strip().strip(".").lower()
+    if len(topic.split()) > MAX_TOPIC_WORDS:
+        logger.warning(f"The question check gave a sentence, not a topic, so no note: {topic!r}")
+        return None
+    return f"I can't check {topic}, but here's how hard the trail is right now."
+
+
+class ExplainRun(BaseModel):
+    """Everything from answering one question: the final response, plus what the AI itself
+    said and the whole conversation (the evals need those to score the AI)."""
+
+    response: ExplainResponse
+    ai_answer: AIAnswer
+    messages: list[Message]
+
+
+async def explain_with_details(question: str, client: LLMClient) -> ExplainRun:
+    """Answer a trail question from start to finish, and keep the details.
+
+    Tools first, then the safety nets, then the JSON answer, then the check for parts of
+    the question we can't answer.
+    """
     result = await run_agent(question, client, TOOL_SPECS)
     await add_weather_if_missing(result.messages)
     engine = await get_engine_result(result.messages)
     answer = await ask_for_answer(client, result.messages)
-    return build_response(answer, engine)
+    response = build_response(answer, engine)
+    response.question_note = await check_question_scope(client, question)
+    return ExplainRun(response=response, ai_answer=answer, messages=result.messages)
+
+
+async def explain(question: str, client: LLMClient) -> ExplainResponse:
+    """Answer a trail question from start to finish and return just the final answer."""
+    run = await explain_with_details(question, client)
+    return run.response

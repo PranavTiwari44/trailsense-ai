@@ -14,6 +14,7 @@ from app.llm.agent import (
     add_weather_if_missing,
     ask_for_answer,
     build_response,
+    check_question_scope,
     explain,
     find_tool_result,
     get_engine_result,
@@ -77,14 +78,38 @@ def test_conversation_starts_with_instructions_then_the_question():
     assert messages[1].content == "How hard is Wolf Trail?"
 
 
-async def test_answers_straight_away_when_no_tool_is_needed():
-    client = FakeClient([LLMResponse(text="Hello, hiker!")])
+async def test_answering_without_tools_gets_one_nudge(caplog):
+    caplog.set_level(logging.WARNING)
+    client = FakeClient([
+        LLMResponse(text="My tools can't check parking."),  # tries to answer without looking anything up
+        LLMResponse(tool_calls=[WEATHER_CALL]),  # after the nudge, it uses a tool
+        LLMResponse(text="It's 4 °C."),
+    ])
+
+    result = await run_agent("Is there parking at Wolf Trail?", client, SOME_TOOLS)
+
+    assert result.answer == "It's 4 °C."
+    assert roles(result.messages) == ["system", "user", "assistant", "user", "assistant", "tool", "assistant"]
+    assert result.messages[3].content == agent.NUDGE_TO_USE_TOOLS
+    assert "without using any tools" in caplog.text
+
+
+async def test_only_nudges_once():
+    client = FakeClient([LLMResponse(text="Hello, hiker!"), LLMResponse(text="Still hello!")])
 
     result = await run_agent("Hi", client, SOME_TOOLS)
 
-    assert result.answer == "Hello, hiker!"
-    assert len(client.conversations_seen) == 1
-    assert roles(result.messages) == ["system", "user", "assistant"]
+    assert result.answer == "Still hello!"  # a second tool-free answer is accepted
+    assert len(client.conversations_seen) == 2
+
+
+async def test_no_nudge_after_tools_were_used():
+    client = FakeClient([LLMResponse(tool_calls=[WEATHER_CALL]), LLMResponse(text="Done.")])
+
+    result = await run_agent("Weather?", client, SOME_TOOLS)
+
+    assert result.answer == "Done."
+    assert len(client.conversations_seen) == 2
 
 
 async def test_runs_the_tool_and_sends_the_result_back():
@@ -130,7 +155,7 @@ async def test_gives_up_after_max_steps():
 
 
 async def test_sends_the_tools_to_the_ai():
-    client = FakeClient([LLMResponse(text="Hi")])
+    client = FakeClient([LLMResponse(tool_calls=[WEATHER_CALL]), LLMResponse(text="Hi")])
 
     await run_agent("Question", client, SOME_TOOLS)
 
@@ -389,6 +414,52 @@ async def test_invalid_json_twice_gives_up_with_answer_error():
     assert len(client.conversations_seen) == 2  # one try + one retry, then stop
 
 
+# --- check_question_scope: questions about things we can't look up ---
+
+NO_NOTE_JSON = '{"other_topic": null}'
+PARKING_NOTE_JSON = '{"other_topic": "Parking."}'
+PARKING_NOTE = "I can't check parking, but here's how hard the trail is right now."
+
+
+async def test_scope_check_names_what_we_cant_answer():
+    client = FakeClient(replies=[], json_replies=[PARKING_NOTE_JSON])
+
+    note = await check_question_scope(client, "Is there parking at Wolf Trail?")
+
+    assert note == PARKING_NOTE  # our code writes the sentence, tidying "Parking." to "parking"
+    assert client.conversations_seen[0][-1].content == "Question: Is there parking at Wolf Trail?"
+
+
+async def test_scope_check_ignores_a_sentence_instead_of_a_topic():
+    client = FakeClient(replies=[], json_replies=['{"other_topic": "There are no current stats for today"}'])
+
+    assert await check_question_scope(client, "How hard is Wolf Trail?") is None
+
+
+async def test_scope_check_gives_no_note_for_a_normal_question():
+    client = FakeClient(replies=[], json_replies=[NO_NOTE_JSON])
+
+    assert await check_question_scope(client, "How hard is Wolf Trail?") is None
+
+
+async def test_scope_check_with_bad_json_just_gives_no_note():
+    client = FakeClient(replies=[], json_replies=[CUT_OFF_JSON])
+
+    assert await check_question_scope(client, "Is there parking?") is None  # never fails the answer
+
+
+async def test_explain_adds_the_note_to_the_response(recorder):
+    client = FakeClient(
+        replies=[LLMResponse(tool_calls=[FIND_TRAIL_CALL, DIFFICULTY_CALL]), LLMResponse(text="Moderate.")],
+        json_replies=[GOOD_JSON, PARKING_NOTE_JSON],  # the final answer, then the scope check
+    )
+
+    response = await explain("Is there parking at Wolf Trail?", client)
+
+    assert response.question_note == PARKING_NOTE
+    assert response.level == "Moderate"  # still answers what it can
+
+
 # --- explain: the whole flow, with no model at all ---
 
 async def test_explain_engine_overrides_the_ai_level(recorder, caplog):
@@ -399,7 +470,7 @@ async def test_explain_engine_overrides_the_ai_level(recorder, caplog):
             LLMResponse(tool_calls=[DIFFICULTY_CALL]),
             LLMResponse(text="It's easy!"),
         ],
-        json_replies=[make_ai_answer(level="Easy").model_dump_json()],  # the AI says Easy...
+        json_replies=[make_ai_answer(level="Easy").model_dump_json(), NO_NOTE_JSON],  # the AI says Easy...
     )
 
     response = await explain("How hard is Wolf Trail?", client)
@@ -415,7 +486,7 @@ async def test_explain_when_the_ai_never_calls_get_difficulty_score(recorder):
             LLMResponse(tool_calls=[FIND_TRAIL_CALL]),
             LLMResponse(text="Looks fine to me."),  # skipped the difficulty tool
         ],
-        json_replies=[GOOD_JSON],
+        json_replies=[GOOD_JSON, NO_NOTE_JSON],
     )
 
     response = await explain("How hard is Wolf Trail?", client)
@@ -424,8 +495,8 @@ async def test_explain_when_the_ai_never_calls_get_difficulty_score(recorder):
     assert recorder.names_run == ["find_trail", "get_weather", "get_difficulty_score"]
     assert response.level == "Moderate"
     assert response.score == 35
-    # The AI's final JSON call could see the engine's result.
-    final_call = client.conversations_seen[-1]
+    # The AI's final JSON call could see the engine's result. ([-1] is the small scope check.)
+    final_call = client.conversations_seen[-2]
     tool_names = []
     for message in final_call:
         tool_names.append(message.tool_name)
@@ -440,7 +511,7 @@ async def test_explain_unknown_trail_is_unknown(monkeypatch):
     client = FakeClient(
         replies=[LLMResponse(tool_calls=[ToolCall(name="find_trail", arguments={"name": "Narnia Loop"})]),
                  LLMResponse(text="I couldn't find it.")],
-        json_replies=[make_ai_answer(level="Easy").model_dump_json()],  # a confused AI says Easy
+        json_replies=[make_ai_answer(level="Easy").model_dump_json(), NO_NOTE_JSON],  # a confused AI says Easy
     )
 
     response = await explain("How hard is the Narnia Loop?", client)

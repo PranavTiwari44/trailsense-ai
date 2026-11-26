@@ -9,7 +9,7 @@
   ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
   ![HTML](https://img.shields.io/badge/HTML-E34F26?logo=html5&logoColor=white)
   ![CSS](https://img.shields.io/badge/CSS-663399?logo=css&logoColor=white)
-  ![Tests](https://img.shields.io/badge/tests-134%20passing-2E7D32)
+  ![Tests](https://img.shields.io/badge/tests-142%20passing-2E7D32)
 </div>
 
 ## About
@@ -50,7 +50,8 @@ The key rule: **my code decides, the AI explains.** If the AI's level disagrees 
 - **Tool calling**: the model picks from `find_trail`, `get_weather`, `get_elevation_gain` and `get_difficulty_score` and chains them on its own (finds the trail, then uses its id). Tool errors go back to the model as messages, and a step limit stops endless loops
 - **Structured output**: the final answer must be JSON matching a Pydantic schema (Ollama's `format` option). It's checked, and retried once with the error if it's invalid
 - **Engine wins**: the level, score and data time always come from the rules engine. A mismatch with the AI is logged
-- **Safety nets**: if the AI forgets the difficulty score or the weather, the app fetches them itself, so the answer always rests on real data
+- **Safety nets**: if the AI forgets the difficulty score or the weather, the app fetches them itself, so the answer always rests on real data. If it tries to answer without looking anything up, it's nudged once to use its tools
+- **Honest about what it can't check**: ask *"Is there parking at the Beltline Trail?"* and the card starts with *"I can't check parking, but here's how hard the trail is right now."* A separate small AI call only names the topic (with examples in the prompt); the app writes the sentence. Nothing about parking is ever guessed
 - **Swappable AI**: the app talks to one `LLMClient` interface; `LLM_PROVIDER` picks the model behind it. Runs locally on Ollama (`qwen3.5:9b`) for free
 
 **Rules engine and data**
@@ -97,7 +98,7 @@ npm run build    # or: npm run watch, to rebuild on every save
 ## Tests
 
 ```powershell
-uv run pytest    # 134 tests, about a second
+uv run pytest    # 142 tests, about a second
 ```
 
 The AI is replaced by a scripted fake client, so the tests need no model, no internet and cost nothing. They cover the rules engine, the data services (with faked HTTP), the tools, the tool loop, the retry on invalid JSON, the engine overriding the AI's level, both safety nets, the API endpoints, the web page files, and the eval checks themselves.
@@ -118,7 +119,7 @@ uv run python -m scripts.try_agent "How hard is the Wolf Trail in Gatineau Park 
 
 ## Evals: testing the AI's answers
 
-Unit tests check my code with a fake AI. **Evals check the real model's answers.** `evals/scenarios.json` holds 18 fixed situations (sunny easy trail, icy steep trail, thunderstorm, missing weather, trail not found, high wind on a ridge...). The tools return each scenario's fixed data, so every run sees the same facts, and the real rules engine still scores it. Each answer is checked for:
+Unit tests check my code with a fake AI. **Evals check the real model's answers.** `evals/scenarios.json` holds 19 fixed situations (sunny easy trail, icy steep trail, thunderstorm, missing weather, trail not found, high wind on a ridge, a parking question...). The tools return each scenario's fixed data, so every run sees the same facts, and the real rules engine still scores it. Each answer is checked for:
 
 - valid JSON matching the schema
 - the right difficulty level (and whether the AI's *own* level agreed with the engine)
@@ -150,7 +151,7 @@ app/
   services/          weather, elevation, place lookup (Open-Meteo), OpenStreetMap trails + fallback
   llm/               the AI side: interface, Ollama client, tools, the agent loop
 web/                 the web page: index.html, styles.css, src/app.ts -> dist/app.js
-evals/               18 fixed scenarios, the runner, and saved results per run
+evals/               19 fixed scenarios, the runner, and saved results per run
 tests/               unit tests (no model, no internet)
 scripts/             small scripts to try each piece by hand
 ```
@@ -168,7 +169,6 @@ Map data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright
 
 ## To do
 
-- A separate `conditions` field for the weather, so the summary has room for trail facts (see the third eval run)
-- An eval check for invented facts without numbers. Live runs showed the small model sometimes adds things that aren't in the data (a made-up "cold alert", "snow" when there was none, calling 11 km/h wind "strong"), which the current number and keyword checks don't catch
-- Faster trail search: Overpass often takes 30–45 s, so a new trail's first answer is slow. Found trails are remembered only until the server restarts; saving them would help
-- Optional: run the same evals with Claude and compare
+- **Parking, washrooms and other facilities**: a `find_facilities` tool that searches OpenStreetMap (`amenity=parking`, `toilets`, `drinking_water`...) around the trailhead, so "Is there parking?" gets a real answer instead of "I can't check parking"
+- **Catch invented facts without numbers**: live runs showed the model sometimes adds things that aren't in the data (a made-up "cold alert", "snow" when there was none). The current checks only catch invented numbers
+- **Faster trail search**: Overpass often takes 30–45 s, so a new trail's first answer is slow. Saving found trails to a file would make repeat questions instant

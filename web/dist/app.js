@@ -81,6 +81,10 @@ function formatDataTime(text) {
 }
 /** Put the answer on the page. */
 function showResult(answer) {
+    // If they asked about something we can't check (like parking), say so first.
+    const questionNote = getElement("question-note");
+    questionNote.textContent = answer.question_note ?? "";
+    questionNote.hidden = answer.question_note === null;
     getElement("trail-name").textContent = answer.trail_name ?? "Trail not found";
     const badge = getElement("level");
     badge.textContent = answer.level;
