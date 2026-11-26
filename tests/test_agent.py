@@ -11,6 +11,7 @@ import pytest
 from app.llm import agent
 from app.llm.agent import (
     AnswerError,
+    add_weather_if_missing,
     ask_for_answer,
     build_response,
     explain,
@@ -218,6 +219,7 @@ TRAIL_RESULT = {"id": "wolf-trail", "name": "Wolf Trail", "length_km": 8.87, "sa
                 "start_lat": 45.54, "start_lon": -75.93, "source": "fallback"}
 ENGINE_RESULT = {"score": 35, "level": "Moderate", "reasons": ["8.87 km long (+8)"],
                  "data_time": "2026-11-25T10:00:00-05:00"}
+WEATHER_RESULT = {"lat": 45.54, "lon": -75.93, "current": {"temp_c": -8.0, "rain_mm": 0.0}}  # trimmed, enough for tests
 
 FIND_TRAIL_CALL = ToolCall(name="find_trail", arguments={"name": "Wolf Trail"})
 DIFFICULTY_CALL = ToolCall(name="get_difficulty_score", arguments={"trail_id": "wolf-trail"})
@@ -241,6 +243,8 @@ class ToolRecorder:
             return json.dumps(TRAIL_RESULT)
         if call.name == "get_difficulty_score":
             return json.dumps(ENGINE_RESULT)
+        if call.name == "get_weather":
+            return json.dumps(WEATHER_RESULT)
         return json.dumps({"error": f"no fake result for {call.name}"})
 
 
@@ -319,6 +323,37 @@ async def test_no_trail_found_means_no_engine_result(recorder):
     assert recorder.names_run == []  # no trail id, so nothing to ask the engine about
 
 
+# --- add_weather_if_missing (the weather safety net, added after the first eval run) ---
+
+async def test_gets_the_weather_itself_when_the_ai_skipped_it(recorder, caplog):
+    caplog.set_level(logging.WARNING)
+    messages = [tool_message("find_trail", TRAIL_RESULT), tool_message("get_difficulty_score", ENGINE_RESULT)]
+
+    await add_weather_if_missing(messages)
+
+    assert recorder.names_run == ["get_weather"]
+    assert "never got the weather" in caplog.text
+    # Asked at the trail's start, and the request comes before its result.
+    assert messages[-2].tool_calls == [ToolCall(name="get_weather", arguments={"lat": 45.54, "lon": -75.93})]
+    assert messages[-1].tool_name == "get_weather"
+
+
+async def test_does_not_get_the_weather_twice(recorder):
+    messages = [tool_message("find_trail", TRAIL_RESULT), tool_message("get_weather", WEATHER_RESULT)]
+
+    await add_weather_if_missing(messages)
+
+    assert recorder.names_run == []
+
+
+async def test_no_weather_without_a_trail(recorder):
+    messages = [tool_message("find_trail", {"error": "No trail found matching 'Narnia Loop'"})]
+
+    await add_weather_if_missing(messages)
+
+    assert recorder.names_run == []  # no trail means no start point to ask about
+
+
 # --- ask_for_answer (structured output + retry) ---
 
 async def test_valid_json_on_the_first_try():
@@ -385,7 +420,8 @@ async def test_explain_when_the_ai_never_calls_get_difficulty_score(recorder):
 
     response = await explain("How hard is Wolf Trail?", client)
 
-    assert recorder.names_run == ["find_trail", "get_difficulty_score"]  # our code filled the gap
+    # Our code filled both gaps: the weather first, then the engine's score.
+    assert recorder.names_run == ["find_trail", "get_weather", "get_difficulty_score"]
     assert response.level == "Moderate"
     assert response.score == 35
     # The AI's final JSON call could see the engine's result.

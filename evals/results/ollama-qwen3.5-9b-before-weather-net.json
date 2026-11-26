@@ -1,0 +1,340 @@
+{
+  "model": "ollama-qwen3.5:9b",
+  "run_at": "2026-11-25T22:02:25",
+  "passed": 15,
+  "total": 18,
+  "results": [
+    {
+      "id": "sunny-short-flat",
+      "expected_level": "Easy",
+      "level": "Easy",
+      "ai_level": "Easy",
+      "valid_json": true,
+      "level_ok": true,
+      "ai_agreed": true,
+      "invented": [],
+      "missing": [],
+      "tools": [
+        "find_trail",
+        "get_difficulty_score"
+      ],
+      "summary": "Meadow Loop has a difficulty level of Easy based on its score from get_difficulty_score.",
+      "seconds": 19.36167569999816,
+      "passed": true
+    },
+    {
+      "id": "wolf-trail-mild",
+      "expected_level": "Moderate",
+      "level": "Moderate",
+      "ai_level": "Moderate",
+      "valid_json": true,
+      "level_ok": true,
+      "ai_agreed": true,
+      "invented": [],
+      "missing": [],
+      "tools": [
+        "find_trail",
+        "get_difficulty_score"
+      ],
+      "summary": "The Wolf Trail in Gatineau Park has a current difficulty level of Moderate with a score of 35.",
+      "seconds": 9.795738200016785,
+      "passed": true
+    },
+    {
+      "id": "long-steep-heavy-rain",
+      "expected_level": "Hard",
+      "level": "Hard",
+      "ai_level": "Hard",
+      "valid_json": true,
+      "level_ok": true,
+      "ai_agreed": true,
+      "invented": [],
+      "missing": [],
+      "tools": [
+        "find_trail",
+        "get_weather",
+        "get_difficulty_score"
+      ],
+      "summary": "The Ridge Traverse trail has a Hard difficulty rating due to its 22 km length, climb requirements, and current heavy rain conditions.",
+      "seconds": 13.981952700007241,
+      "passed": true
+    },
+    {
+      "id": "thunderstorm-easy-trail",
+      "expected_level": "Dangerous",
+      "level": "Dangerous",
+      "ai_level": "Dangerous",
+      "valid_json": true,
+      "level_ok": true,
+      "ai_agreed": true,
+      "invented": [],
+      "missing": [],
+      "tools": [
+        "find_trail",
+        "get_difficulty_score"
+      ],
+      "summary": "The Lakeside Path is currently rated as Dangerous due to active thunderstorms and a 60m climb.",
+      "seconds": 10.785592600004748,
+      "passed": true
+    },
+    {
+      "id": "thunderstorm-hard-trail",
+      "expected_level": "Dangerous",
+      "level": "Dangerous",
+      "ai_level": "Dangerous",
+      "valid_json": true,
+      "level_ok": true,
+      "ai_agreed": true,
+      "invented": [],
+      "missing": [],
+      "tools": [
+        "find_trail",
+        "get_difficulty_score",
+        "get_weather"
+      ],
+      "summary": "No, you cannot hike this afternoon because a thunderstorm with heavy rain will cause dangerous conditions on the trail.",
+      "seconds": 16.646368200017605,
+      "passed": true
+    },
+    {
+      "id": "missing-weather",
+      "expected_level": "Unknown",
+      "level": "Unknown",
+      "ai_level": "Unknown",
+      "valid_json": true,
+      "level_ok": true,
+      "ai_agreed": true,
+      "invented": [],
+      "missing": [],
+      "tools": [
+        "find_trail",
+        "get_difficulty_score"
+      ],
+      "summary": "The difficulty of Pine Woods Trail is currently Unknown because weather data required for the score calculation is unavailable.",
+      "seconds": 9.255823299987242,
+      "passed": true
+    },
+    {
+      "id": "missing-elevation",
+      "expected_level": "Unknown",
+      "level": "Unknown",
+      "ai_level": "Unknown",
+      "valid_json": true,
+      "level_ok": true,
+      "ai_agreed": true,
+      "invented": [],
+      "missing": [],
+      "tools": [
+        "find_trail",
+        "get_difficulty_score"
+      ],
+      "summary": "The current difficulty for Cedar Ridge is Unknown due to missing elevation gain data.",
+      "seconds": 8.378236200020183,
+      "passed": true
+    },
+    {
+      "id": "trail-not-found",
+      "expected_level": "Unknown",
+      "level": "Unknown",
+      "ai_level": "Unknown",
+      "valid_json": true,
+      "level_ok": true,
+      "ai_agreed": true,
+      "invented": [],
+      "missing": [],
+      "tools": [
+        "find_trail"
+      ],
+      "summary": "The Narnia Loop was not found in the database, so its difficulty level is Unknown.",
+      "seconds": 11.13686470000539,
+      "passed": true
+    },
+    {
+      "id": "icy-after-rain",
+      "expected_level": "Moderate",
+      "level": "Moderate",
+      "ai_level": "Moderate",
+      "valid_json": true,
+      "level_ok": true,
+      "ai_agreed": true,
+      "invented": [],
+      "missing": [],
+      "tools": [
+        "find_trail",
+        "get_difficulty_score"
+      ],
+      "summary": "The Maple Ridge trail has a Moderate difficulty level this morning due to ice conditions and its length.",
+      "seconds": 12.49118890002137,
+      "passed": true
+    },
+    {
+      "id": "fresh-snow",
+      "expected_level": "Moderate",
+      "level": "Moderate",
+      "ai_level": "Moderate",
+      "valid_json": true,
+      "level_ok": true,
+      "ai_agreed": true,
+      "invented": [],
+      "missing": [
+        "snow"
+      ],
+      "tools": [
+        "find_trail",
+        "get_difficulty_score"
+      ],
+      "summary": "Birch Loop is rated Moderate today due to its length and current ice conditions.",
+      "seconds": 11.920851699949708,
+      "passed": false
+    },
+    {
+      "id": "very-long-flat",
+      "expected_level": "Moderate",
+      "level": "Moderate",
+      "ai_level": "Moderate",
+      "valid_json": true,
+      "level_ok": true,
+      "ai_agreed": true,
+      "invented": [],
+      "missing": [],
+      "tools": [
+        "find_trail",
+        "get_difficulty_score"
+      ],
+      "summary": "The River Trail has a current difficulty score of 26, which corresponds to a Moderate level.",
+      "seconds": 10.018546399951447,
+      "passed": true
+    },
+    {
+      "id": "windy-ridge",
+      "expected_level": "Hard",
+      "level": "Hard",
+      "ai_level": "Hard",
+      "valid_json": true,
+      "level_ok": true,
+      "ai_agreed": true,
+      "invented": [],
+      "missing": [],
+      "tools": [
+        "find_trail",
+        "get_difficulty_score"
+      ],
+      "summary": "The Eagle Ridge trail has a difficulty score of 52 and is currently rated as Hard due to factors like its length and strong winds.",
+      "seconds": 12.282762799994089,
+      "passed": true
+    },
+    {
+      "id": "hot-day",
+      "expected_level": "Moderate",
+      "level": "Moderate",
+      "ai_level": "Moderate",
+      "valid_json": true,
+      "level_ok": true,
+      "ai_agreed": true,
+      "invented": [],
+      "missing": [],
+      "tools": [
+        "find_trail",
+        "get_difficulty_score"
+      ],
+      "summary": "The Sunny Slopes Trail currently has a Moderate difficulty rating based on its length, climb, and mountain hiking tag.",
+      "seconds": 12.245679299987387,
+      "passed": true
+    },
+    {
+      "id": "alpine-route",
+      "expected_level": "Hard",
+      "level": "Hard",
+      "ai_level": "Hard",
+      "valid_json": true,
+      "level_ok": true,
+      "ai_agreed": true,
+      "invented": [],
+      "missing": [],
+      "tools": [
+        "find_trail",
+        "get_difficulty_score"
+      ],
+      "summary": "The Granite Peak Route is currently rated as Hard with a difficulty score of 63.",
+      "seconds": 9.912467499962077,
+      "passed": true
+    },
+    {
+      "id": "everything-bad",
+      "expected_level": "Dangerous",
+      "level": "Dangerous",
+      "ai_level": "Dangerous",
+      "valid_json": true,
+      "level_ok": true,
+      "ai_agreed": true,
+      "invented": [],
+      "missing": [],
+      "tools": [
+        "find_trail",
+        "get_difficulty_score",
+        "get_weather"
+      ],
+      "summary": "Today's conditions are Dangerous due to heavy rain and strong winds, making this 25 km alpine hike unsafe.",
+      "seconds": 17.88049160002265,
+      "passed": true
+    },
+    {
+      "id": "light-rain-below-limit",
+      "expected_level": "Easy",
+      "level": "Easy",
+      "ai_level": "Easy",
+      "valid_json": true,
+      "level_ok": true,
+      "ai_agreed": true,
+      "invented": [],
+      "missing": [
+        "rain"
+      ],
+      "tools": [
+        "find_trail",
+        "get_difficulty_score"
+      ],
+      "summary": "The Fern Gully Trail is currently rated as Easy.",
+      "seconds": 10.281183500017505,
+      "passed": false
+    },
+    {
+      "id": "cold-and-dry",
+      "expected_level": "Easy",
+      "level": "Easy",
+      "ai_level": "Easy",
+      "valid_json": true,
+      "level_ok": true,
+      "ai_agreed": true,
+      "invented": [],
+      "missing": [
+        "cold|-8"
+      ],
+      "tools": [
+        "find_trail",
+        "get_difficulty_score"
+      ],
+      "summary": "The Frost Hollow Trail has a difficulty score of 7 and is currently rated as Easy.",
+      "seconds": 11.120114999997895,
+      "passed": false
+    },
+    {
+      "id": "wet-but-above-freezing",
+      "expected_level": "Easy",
+      "level": "Easy",
+      "ai_level": "Easy",
+      "valid_json": true,
+      "level_ok": true,
+      "ai_agreed": true,
+      "invented": [],
+      "missing": [],
+      "tools": [
+        "find_trail",
+        "get_difficulty_score"
+      ],
+      "summary": "Willow Creek Trail has a difficulty score of 10 and is rated as Easy.",
+      "seconds": 9.818785599956755,
+      "passed": true
+    }
+  ]
+}

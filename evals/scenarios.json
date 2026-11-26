@@ -1,0 +1,167 @@
+{
+  "_about": "Fixed situations for testing the real AI. Each tool returns this data instead of calling the internet. trail/climb_m/weather set to null means that data is missing. must_mention: words the answer must contain (case doesn't matter); 'a|b' means either word is fine.",
+  "scenarios": [
+    {
+      "id": "sunny-short-flat",
+      "question": "How hard is Meadow Loop right now?",
+      "trail": {"id": "meadow-loop", "name": "Meadow Loop", "length_km": 2.4, "sac_scale": "hiking"},
+      "climb_m": 40,
+      "weather": {"temp_c": 18, "weather_code": 0},
+      "expected_level": "Easy",
+      "must_mention": ["easy"]
+    },
+    {
+      "id": "wolf-trail-mild",
+      "question": "How hard is the Wolf Trail in Gatineau Park right now?",
+      "trail": {"id": "wolf-trail", "name": "Wolf Trail", "length_km": 8.87, "sac_scale": "demanding_mountain_hiking"},
+      "climb_m": 360,
+      "weather": {"temp_c": 9, "weather_code": 1},
+      "expected_level": "Moderate",
+      "must_mention": ["moderate"]
+    },
+    {
+      "id": "long-steep-heavy-rain",
+      "question": "Is Ridge Traverse a good idea today?",
+      "trail": {"id": "ridge-traverse", "name": "Ridge Traverse", "length_km": 22, "sac_scale": "demanding_mountain_hiking"},
+      "climb_m": 1100,
+      "weather": {"temp_c": 12, "rain_mm": 5, "weather_code": 63},
+      "expected_level": "Hard",
+      "must_mention": ["rain"]
+    },
+    {
+      "id": "thunderstorm-easy-trail",
+      "question": "How hard is Lakeside Path right now?",
+      "trail": {"id": "lakeside-path", "name": "Lakeside Path", "length_km": 3, "sac_scale": "hiking"},
+      "climb_m": 60,
+      "weather": {"temp_c": 24, "rain_mm": 1, "weather_code": 95},
+      "expected_level": "Dangerous",
+      "must_mention": ["thunder"]
+    },
+    {
+      "id": "thunderstorm-hard-trail",
+      "question": "Can I hike Summit Trail this afternoon?",
+      "trail": {"id": "summit-trail", "name": "Summit Trail", "length_km": 14, "sac_scale": "mountain_hiking"},
+      "climb_m": 700,
+      "weather": {"temp_c": 22, "rain_mm": 3, "weather_code": 96},
+      "expected_level": "Dangerous",
+      "must_mention": ["thunder"]
+    },
+    {
+      "id": "missing-weather",
+      "question": "How hard is Pine Woods Trail right now?",
+      "trail": {"id": "pine-woods-trail", "name": "Pine Woods Trail", "length_km": 5, "sac_scale": "hiking"},
+      "climb_m": 100,
+      "weather": null,
+      "expected_level": "Unknown",
+      "must_mention": ["weather"]
+    },
+    {
+      "id": "missing-elevation",
+      "question": "How hard is Cedar Ridge right now?",
+      "trail": {"id": "cedar-ridge", "name": "Cedar Ridge", "length_km": 6, "sac_scale": "mountain_hiking"},
+      "climb_m": null,
+      "weather": {"temp_c": 15, "weather_code": 2},
+      "expected_level": "Unknown",
+      "must_mention": ["elevation|climb"]
+    },
+    {
+      "id": "trail-not-found",
+      "question": "How hard is the Narnia Loop right now?",
+      "trail": null,
+      "climb_m": null,
+      "weather": null,
+      "expected_level": "Unknown",
+      "must_mention": ["find|found"]
+    },
+    {
+      "id": "icy-after-rain",
+      "question": "How hard is Maple Ridge this morning?",
+      "trail": {"id": "maple-ridge", "name": "Maple Ridge", "length_km": 8, "sac_scale": "mountain_hiking"},
+      "climb_m": 400,
+      "weather": {"temp_c": -3, "recent_rain_mm": 2, "weather_code": 3},
+      "expected_level": "Moderate",
+      "must_mention": ["ice|icy"]
+    },
+    {
+      "id": "fresh-snow",
+      "question": "How hard is Birch Loop today?",
+      "trail": {"id": "birch-loop", "name": "Birch Loop", "length_km": 7, "sac_scale": "hiking"},
+      "climb_m": 150,
+      "weather": {"temp_c": -5, "snowfall_cm": 1.5, "weather_code": 73},
+      "expected_level": "Moderate",
+      "must_mention": ["snow"]
+    },
+    {
+      "id": "very-long-flat",
+      "question": "How hard is the River Trail right now?",
+      "trail": {"id": "river-trail", "name": "River Trail", "length_km": 30, "sac_scale": "hiking"},
+      "climb_m": 50,
+      "weather": {"temp_c": 16, "weather_code": 1},
+      "expected_level": "Moderate",
+      "must_mention": ["long|distance"]
+    },
+    {
+      "id": "windy-ridge",
+      "question": "How hard is Eagle Ridge right now?",
+      "trail": {"id": "eagle-ridge", "name": "Eagle Ridge", "length_km": 10, "sac_scale": "demanding_mountain_hiking"},
+      "climb_m": 600,
+      "weather": {"temp_c": 8, "wind_kmh": 65, "weather_code": 3},
+      "expected_level": "Hard",
+      "must_mention": ["wind"]
+    },
+    {
+      "id": "hot-day",
+      "question": "How hard is Sunny Slopes Trail this afternoon?",
+      "trail": {"id": "sunny-slopes-trail", "name": "Sunny Slopes Trail", "length_km": 12, "sac_scale": "mountain_hiking"},
+      "climb_m": 500,
+      "weather": {"temp_c": 33, "weather_code": 0},
+      "expected_level": "Moderate",
+      "must_mention": ["heat|hot"]
+    },
+    {
+      "id": "alpine-route",
+      "question": "How hard is Granite Peak Route right now?",
+      "trail": {"id": "granite-peak-route", "name": "Granite Peak Route", "length_km": 9, "sac_scale": "alpine_hiking"},
+      "climb_m": 1200,
+      "weather": {"temp_c": 6, "weather_code": 1},
+      "expected_level": "Hard",
+      "must_mention": ["alpine"]
+    },
+    {
+      "id": "everything-bad",
+      "question": "Should I do the Storm King Traverse today?",
+      "trail": {"id": "storm-king-traverse", "name": "Storm King Traverse", "length_km": 25, "sac_scale": "alpine_hiking"},
+      "climb_m": 1500,
+      "weather": {"temp_c": 7, "rain_mm": 6, "wind_kmh": 70, "weather_code": 65},
+      "expected_level": "Dangerous",
+      "must_mention": ["rain", "wind"]
+    },
+    {
+      "id": "light-rain-below-limit",
+      "question": "How hard is Fern Gully Trail right now?",
+      "trail": {"id": "fern-gully-trail", "name": "Fern Gully Trail", "length_km": 8, "sac_scale": "mountain_hiking"},
+      "climb_m": 300,
+      "weather": {"temp_c": 11, "rain_mm": 1, "weather_code": 61},
+      "expected_level": "Easy",
+      "must_mention": ["rain"]
+    },
+    {
+      "id": "cold-and-dry",
+      "question": "How hard is Frost Hollow Trail right now?",
+      "trail": {"id": "frost-hollow-trail", "name": "Frost Hollow Trail", "length_km": 5, "sac_scale": "hiking"},
+      "climb_m": 100,
+      "weather": {"temp_c": -8, "weather_code": 0},
+      "expected_level": "Easy",
+      "must_mention": ["cold|-8"]
+    },
+    {
+      "id": "wet-but-above-freezing",
+      "question": "How hard is Willow Creek Trail right now?",
+      "trail": {"id": "willow-creek-trail", "name": "Willow Creek Trail", "length_km": 6, "sac_scale": "hiking"},
+      "climb_m": 200,
+      "weather": {"temp_c": 2, "recent_rain_mm": 3, "weather_code": 3},
+      "expected_level": "Easy",
+      "must_mention": ["easy"]
+    }
+  ]
+}

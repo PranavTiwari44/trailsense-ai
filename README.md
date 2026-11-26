@@ -57,6 +57,27 @@ Ask the local model a question and watch it use the tools (needs Ollama running)
 uv run python -m scripts.try_agent "How hard is the Wolf Trail in Gatineau Park right now?"
 ```
 
+## Evals: testing the AI's answers
+
+Unit tests check my code with a fake AI. **Evals check the real model's answers.** `evals/scenarios.json` holds 18 fixed situations (sunny easy trail, icy steep trail, thunderstorm, missing weather, trail not found, high wind on a ridge...). The tools return each scenario's fixed data, so every run sees the same facts, and the real rules engine still scores it. Each answer is checked for:
+
+- valid JSON matching the schema
+- the right difficulty level (and whether the AI's *own* level agreed with the engine)
+- no invented numbers: every number in the summary must appear in the tool data
+- must-mention words (e.g. "thunder" in a thunderstorm, "ice" on an icy trail)
+
+```powershell
+uv run python -m evals.run_evals            # all scenarios (Ollama must be running)
+uv run python -m evals.run_evals hot-day    # just one
+```
+
+| Run | Model | Passed | AI agreed with engine | Avg time |
+|---|---|---|---|---|
+| First run | qwen3.5:9b (local) | 15/18 (83%) | 18/18 | 12.1 s |
+| + weather safety net | qwen3.5:9b (local) | 16/18 (89%) | 18/18 | 11.4 s |
+
+The first run showed the model skipped `get_weather` in every scenario, so it couldn't mention light rain, snow or cold. Adding a code safety net (fetch the weather if the model didn't) fixed two of the three failures. The second run also caught the model writing "winds exceeding 60 km/h" when the data said 65: the invented-number check working as intended.
+
 ## Data
 
 | Source | Used for | Key needed |
@@ -70,5 +91,4 @@ Map data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright
 
 ## To do
 
-- An eval set that runs fixed scenarios through the real model and scores the answers
 - A web page for asking questions (TypeScript)

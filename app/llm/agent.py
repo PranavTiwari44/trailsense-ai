@@ -116,6 +116,32 @@ def find_tool_result(messages: list[Message], tool_name: str) -> dict[str, Any] 
     return None
 
 
+async def run_tool_for_the_ai(messages: list[Message], call: ToolCall) -> None:
+    """Run a tool the AI forgot, and add it to the conversation as if the AI had asked.
+
+    The request goes in before the result, so the AI never sees a result it didn't request.
+    """
+    messages.append(Message(role="assistant", tool_calls=[call]))
+    messages.extend(await run_tool_calls([call]))
+
+
+async def add_weather_if_missing(messages: list[Message]) -> None:
+    """If the AI never got the weather, fetch it at the trail's start so the answer can describe it.
+
+    Small models often skip get_weather because get_difficulty_score already uses the weather
+    inside our code. But then the AI can't mention light rain, cold or snow. Does nothing if
+    the AI already has the weather, or if no trail was found.
+    """
+    if find_tool_result(messages, "get_weather") is not None:
+        return
+    trail = find_tool_result(messages, "find_trail")
+    if trail is None:
+        return
+    logger.warning("The AI never got the weather; calling get_weather ourselves")
+    call = ToolCall(name="get_weather", arguments={"lat": trail["start_lat"], "lon": trail["start_lon"]})
+    await run_tool_for_the_ai(messages, call)
+
+
 async def get_engine_result(messages: list[Message]) -> DifficultyResult | None:
     """The rules engine's decision for this question.
 
@@ -134,9 +160,7 @@ async def get_engine_result(messages: list[Message]) -> DifficultyResult | None:
 
     logger.warning("The AI never called get_difficulty_score; calling it ourselves")
     call = ToolCall(name="get_difficulty_score", arguments={"trail_id": trail["id"]})
-    # Add it as if the AI had asked, so the AI never sees a result it didn't request.
-    messages.append(Message(role="assistant", tool_calls=[call]))
-    messages.extend(await run_tool_calls([call]))
+    await run_tool_for_the_ai(messages, call)
 
     data = find_tool_result(messages, "get_difficulty_score")
     if data is None:
@@ -193,6 +217,7 @@ def build_response(answer: AIAnswer, engine: DifficultyResult | None) -> Explain
 async def explain(question: str, client: LLMClient) -> ExplainResponse:
     """Answer a trail question from start to finish: tools, then the engine's result, then the JSON answer."""
     result = await run_agent(question, client, TOOL_SPECS)
+    await add_weather_if_missing(result.messages)
     engine = await get_engine_result(result.messages)
     answer = await ask_for_answer(client, result.messages)
     return build_response(answer, engine)
